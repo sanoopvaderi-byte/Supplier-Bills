@@ -373,7 +373,7 @@ function render(){
     payEvents(b).forEach((p,k)=>{paid+=p.a;if(p.d.slice(0,7)===ym)paidM+=p.a;acts.push({d:p.d,seq:n*2+1+k/100,k:'pay',t:b.supplier,sub:'Payment'+(b.no?' · Bill '+b.no:''),a:p.a,s:'Paid'})});
   });
   const h=new Date().getHours();
-  $('greet').textContent=(h<12?'Good morning':h<17?'Good afternoon':'Good evening')+', Sanoop';
+  $('greet').textContent=(h<12?'Good morning':h<17?'Good afternoon':'Good evening');
   $('hDate').textContent=new Date().toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
   $('sPend').textContent=inr(pend);
   $('sDue').textContent=due?due+' open bill'+(due>1?'s':'')+(over>0?' · '+inr(over)+' overdue':''):'All bills are settled';
