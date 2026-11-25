@@ -232,7 +232,7 @@ td:not(:first-child),th:not(:first-child){text-align:right;font-variant-numeric:
       </div>
 
       <div class="card">
-        <div class="sec"><h2>Recent activity</h2><button class="link" id="viewAll" type="button">View all</button></div>
+        <div class="sec"><h2 id="actsTitle">Today’s activity</h2><button class="link" id="viewAll" type="button">View all</button></div>
         <div id="acts"></div>
       </div>
     </section>
@@ -369,7 +369,7 @@ function render(){
   S.bills.forEach((b,n)=>{
     const i=info(b);buy+=b.amount;if(b.date.slice(0,7)===ym)buyM+=b.amount;
     if(i.bal>0){pend+=i.bal;due++;if(i.st==='overdue'){over+=i.bal;nOver++}if(i.st==='overdue'||i.st==='soon')attn.push({b,i})}
-    acts.push({d:b.date,seq:n*2,k:'buy',t:b.supplier,sub:'Purchase'+(b.no?' · Bill '+b.no:''),a:b.amount,s:i.bal<=0?'Paid':'Pending'});
+    acts.push({d:b.created||b.date,seq:n*2,k:'buy',t:b.supplier,sub:'Purchase'+(b.no?' · Bill '+b.no:''),a:b.amount,s:i.bal<=0?'Paid':'Pending'});
     payEvents(b).forEach((p,k)=>{paid+=p.a;if(p.d.slice(0,7)===ym)paidM+=p.a;acts.push({d:p.d,seq:n*2+1+k/100,k:'pay',t:b.supplier,sub:'Payment'+(b.no?' · Bill '+b.no:''),a:p.a,s:'Paid'})});
   });
   const h=new Date().getHours();
@@ -384,9 +384,12 @@ function render(){
   attn.sort((a,c)=>a.i.due-c.i.due);
   $('attn').innerHTML=attn.length?attn.slice(0,4).map(({b,i})=>`<button class="row" type="button" data-go="list"><span class="dot d-${i.st}"></span><span class="tx"><b>${esc(b.supplier)}</b><span>Bill ${esc(b.no||'–')} · ${dueText(i)}</span></span><span class="amt">${inr(i.bal)}</span></button>`).join(''):empty('check','You are all caught up. Nothing is overdue or due this week.');
   acts.sort((x,y)=>y.d<x.d?-1:y.d>x.d?1:y.seq-x.seq);
-  const shown=showAll?acts.slice(0,100):acts.slice(0,5);
-  $('acts').innerHTML=shown.length?shown.map(a=>`<div class="row"><span class="chip-ic ${a.k==='buy'?'c-blue':'c-green'}"><svg class="i"><use href="#i-${a.k==='buy'?'cart':'card'}"/></svg></span><span class="tx"><b>${esc(a.t)}</b><span>${a.sub} · ${fmtShort(a.d)}</span></span><span class="amt">${inr(a.a)}<small><span class="tag ${a.s==='Paid'?'paid':'pending'}">${a.s}</span></small></span></div>`).join(''):empty('inbox','No activity yet. Tap New to add your first bill.');
-  $('viewAll').textContent=showAll?'Show less':'View all';$('viewAll').hidden=acts.length<=5;
+  const todayS=iso(new Date());
+  const todays=acts.filter(a=>a.d===todayS);
+  const shown=showAll?acts.slice(0,100):todays;
+  $('actsTitle').textContent=showAll?'All activity':'Today’s activity';
+  $('acts').innerHTML=shown.length?shown.map(a=>`<div class="row"><span class="chip-ic ${a.k==='buy'?'c-blue':'c-green'}"><svg class="i"><use href="#i-${a.k==='buy'?'cart':'card'}"/></svg></span><span class="tx"><b>${esc(a.t)}</b><span>${a.sub}${showAll?' · '+fmtShort(a.d):''}</span></span><span class="amt">${inr(a.a)}<small><span class="tag ${a.s==='Paid'?'paid':'pending'}">${a.s}</span></small></span></div>`).join(''):empty('inbox',acts.length?'No bills or payments today yet. Tap View all to see earlier activity.':'No activity yet. Tap New to add your first bill.');
+  $('viewAll').textContent=showAll?'Today only':'View all';$('viewAll').hidden=!showAll&&acts.length===todays.length;
   // pay plan
   $('budget').value=S.budget;
   let rest=Number(S.budget)||0,tot=0,html='';
@@ -453,7 +456,7 @@ $('date').value=iso(new Date());$('days').value=S.defDays;$('date').oninput=dueU
 $('add').onclick=()=>{
   const supplier=$('supplier').value.trim(),amount=parseFloat($('amount').value),date=$('date').value;
   if(!supplier||!(amount>0)||!date){toast('Enter supplier, amount and bill date');return}
-  S.bills.push({id:Date.now().toString(36)+Math.random().toString(36).slice(2,5),supplier,no:$('no').value.trim(),amount,date,days:Number($('days').value)||0,notes:$('notes').value.trim(),paid:0,pays:[]});
+  S.bills.push({id:Date.now().toString(36)+Math.random().toString(36).slice(2,5),supplier,no:$('no').value.trim(),amount,date,days:Number($('days').value)||0,notes:$('notes').value.trim(),paid:0,pays:[],created:iso(new Date())});
   save();['supplier','no','amount','notes'].forEach(k=>$(k).value='');toast('Bill saved · add the next one');render();$('supplier').focus({preventScroll:true});
 };
 function recordPay(b,v){const bal=info(b).bal;v=Math.min(v,bal);if(!(v>0))return;b.paid=(b.paid||0)+v;b.pays.push({d:iso(new Date()),a:v});save();render();toast(inr(v)+' payment recorded')}
@@ -472,6 +475,8 @@ function dl(name,text,type){const a=document.createElement('a');a.href=URL.creat
 $('csv').onclick=()=>{const h='Supplier,Bill no,Bill date,Due date,Amount,Paid,Balance,Note\n';dl('supplier-bills.csv',h+S.bills.map(b=>{const i=info(b);return[b.supplier,b.no,b.date,iso(i.due),b.amount,b.paid||0,i.bal,b.notes].map(v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"').join(',')}).join('\n'),'text/csv')};
 $('bak').onclick=()=>dl('supplier-bills-backup.json',JSON.stringify(S),'application/json');
 $('rst').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const p=JSON.parse(r.result);if(Array.isArray(p.bills)){S=Object.assign({budget:1000,defDays:90},p);norm();save();render();toast('Backup restored')}}catch(x){toast('Could not read that file')}};r.readAsText(f)};
+let lastDay=iso(new Date());
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&iso(new Date())!==lastDay){lastDay=iso(new Date());render()}});
 route();
 </script>
 </body>
