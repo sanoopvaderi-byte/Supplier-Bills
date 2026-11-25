@@ -123,6 +123,10 @@ input[type=file]::file-selector-button{margin-right:12px;border:0;border-radius:
 .bnums b{color:var(--ink)}
 .pay{display:flex;gap:8px}.pay input{min-height:44px}.pay .btn{min-height:44px;white-space:nowrap}
 .payform{display:grid;grid-template-columns:1fr 1fr;gap:8px}.payform input{min-height:44px}.payform .btn{grid-column:1/-1}
+.expgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.expgrid .btn{font-size:.84rem;padding:10px 8px;text-align:center;line-height:1.25}
+#modal{position:fixed;inset:0;z-index:100;display:grid;place-items:center;padding:20px;background:rgba(10,17,29,.55);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)}
+.mbox{width:100%;max-width:380px;background:var(--surface);border:1px solid var(--line);border-radius:22px;padding:20px;box-shadow:0 24px 60px rgba(0,0,0,.35);animation:in .2s ease both}
+@media (max-width:340px){.expgrid{grid-template-columns:1fr}}
 .phist{border-top:1px dashed var(--line);padding-top:8px;display:grid;gap:4px;font-size:.84rem;color:var(--mute)}
 .phist .pl{display:flex;justify-content:space-between;gap:8px}.phist b{color:var(--ink)}
 .acts{display:flex;gap:8px}.acts .btn{flex:1}
@@ -190,6 +194,7 @@ td:not(:first-child),th:not(:first-child){text-align:right;font-variant-numeric:
 <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
 <symbol id="i-inbox" viewBox="0 0 24 24"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.5 5.1 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.5-6.9A2 2 0 0 0 16.7 4H7.3a2 2 0 0 0-1.8 1.1z"/></symbol>
 <symbol id="i-down" viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M4 21h16"/></symbol>
+<symbol id="i-lock" viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></symbol>
 <symbol id="i-up" viewBox="0 0 24 24"><path d="M12 15V3M7 8l5-5 5 5M4 21h16"/></symbol>
 </defs>
 </svg>
@@ -237,6 +242,17 @@ td:not(:first-child),th:not(:first-child){text-align:right;font-variant-numeric:
       <div class="card">
         <div class="sec"><h2 id="actsTitle">Today’s activity</h2><button class="link" id="viewAll" type="button">View all</button></div>
         <div id="acts"></div>
+      </div>
+
+      <div class="card">
+        <h2 style="margin-bottom:4px">Export details</h2>
+        <p class="hint" style="margin:0 0 12px">Download bills, payments &amp; receipts, supplier totals, or a backup.</p>
+        <div class="expgrid">
+          <button class="btn ghost" type="button" data-exp="bills"><svg class="i"><use href="#i-down"/></svg>Bills CSV</button>
+          <button class="btn ghost" type="button" data-exp="payments"><svg class="i"><use href="#i-down"/></svg>Payments CSV</button>
+          <button class="btn ghost" type="button" data-exp="suppliers"><svg class="i"><use href="#i-down"/></svg>Suppliers CSV</button>
+          <button class="btn ghost" type="button" data-exp="backup"><svg class="i"><use href="#i-down"/></svg>Backup</button>
+        </div>
       </div>
     </section>
 
@@ -292,7 +308,16 @@ td:not(:first-child),th:not(:first-child){text-align:right;font-variant-numeric:
       </div>
       <div class="card"><div class="sec"><h2>Month-wise</h2><span class="meta"><span style="color:#3b82f6">●</span> Purchases &nbsp;<span style="color:#22c55e">●</span> Payments</span></div><div id="rMonth"></div></div>
       <div class="card"><h2 style="margin-bottom:6px">Supplier-wise</h2><div class="scroll"><table><thead><tr><th>Supplier</th><th>Billed</th><th>Paid</th><th>Pending</th></tr></thead><tbody id="rSup"></tbody></table></div></div>
-      <button class="btn ghost" id="csv" type="button"><svg class="i"><use href="#i-down"/></svg>Download CSV</button>
+      <div class="card">
+        <h2 style="margin-bottom:4px">Export details</h2>
+        <p class="hint" style="margin:0 0 12px">CSVs open in Excel or Google Sheets. Backup saves everything.</p>
+        <div class="expgrid">
+          <button class="btn ghost" type="button" data-exp="bills"><svg class="i"><use href="#i-down"/></svg>Bills CSV</button>
+          <button class="btn ghost" type="button" data-exp="payments"><svg class="i"><use href="#i-down"/></svg>Payments CSV</button>
+          <button class="btn ghost" type="button" data-exp="suppliers"><svg class="i"><use href="#i-down"/></svg>Suppliers CSV</button>
+          <button class="btn ghost" type="button" data-exp="backup"><svg class="i"><use href="#i-down"/></svg>Backup</button>
+        </div>
+      </div>
     </section>
 
     <!-- SETTINGS -->
@@ -301,15 +326,44 @@ td:not(:first-child),th:not(:first-child){text-align:right;font-variant-numeric:
         <div class="setrow"><div><b>Default credit days</b><div class="meta">Used for new bills</div></div><input id="sdays" type="number" min="0" inputmode="numeric" style="width:96px;text-align:center"></div>
       </div>
       <div class="card">
-        <h2 style="margin-bottom:10px">Backup</h2>
-        <div style="display:grid;gap:12px">
-          <button class="btn ghost" id="bak" type="button"><svg class="i"><use href="#i-down"/></svg>Download backup</button>
-          <label>Restore backup<input id="rst" type="file" accept=".json" style="padding:10px 14px"></label>
+        <h2 style="margin-bottom:4px">Export details</h2>
+        <p class="hint" style="margin:0 0 12px">Bills, payments &amp; receipts, and supplier totals open in Excel or Google Sheets. Backup can be restored here later.</p>
+        <div class="expgrid">
+          <button class="btn ghost" type="button" data-exp="bills"><svg class="i"><use href="#i-down"/></svg>Bills CSV</button>
+          <button class="btn ghost" type="button" data-exp="payments"><svg class="i"><use href="#i-down"/></svg>Payments CSV</button>
+          <button class="btn ghost" type="button" data-exp="suppliers"><svg class="i"><use href="#i-down"/></svg>Suppliers CSV</button>
+          <button class="btn ghost" type="button" data-exp="backup"><svg class="i"><use href="#i-down"/></svg>Full backup</button>
         </div>
+      </div>
+      <div class="card">
+        <label>Restore from backup<input id="rst" type="file" accept=".json"></label>
         <p class="hint" style="margin-top:10px">Data is saved in this browser only. Download a backup regularly.</p>
+      </div>
+      <div class="card" style="border-color:color-mix(in srgb,var(--red) 40%,var(--line))">
+        <h2 style="color:var(--red);margin-bottom:4px">Danger zone</h2>
+        <p class="hint" style="margin:0 0 12px">Clears every bill, payment and setting from this device. Locked with a PIN.</p>
+        <button class="btn bad" id="resetBtn" type="button" style="width:100%"><svg class="i"><use href="#i-lock"/></svg>Reset all data</button>
       </div>
     </section>
   </main>
+
+  <div id="modal" hidden>
+    <div class="mbox" role="dialog" aria-modal="true" aria-labelledby="mTitle">
+      <div id="mStep1">
+        <h2 id="mTitle">Enter PIN</h2>
+        <p class="meta" style="margin:4px 0 14px">Enter the 4-digit PIN to unlock the reset.</p>
+        <input id="pin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" placeholder="••••" aria-label="PIN" style="text-align:center;letter-spacing:.6em;font-size:22px">
+        <p id="pinErr" class="meta" style="color:var(--red);margin:8px 0 0" hidden></p>
+        <div class="acts" style="margin-top:16px"><button class="btn ghost" type="button" data-close>Cancel</button><button class="btn" id="pinOk" type="button">Unlock</button></div>
+      </div>
+      <div id="mStep2" hidden>
+        <h2>Erase all data?</h2>
+        <p class="meta" id="mWarn" style="margin:4px 0 14px"></p>
+        <button class="btn ghost" type="button" data-exp="backup" style="width:100%"><svg class="i"><use href="#i-down"/></svg>Download backup first</button>
+        <div class="acts" style="margin-top:12px"><button class="btn ghost" type="button" data-close>Cancel</button><button class="btn bad" id="doReset" type="button">Erase everything</button></div>
+      </div>
+    </div>
+  </div>
 
   <footer class="sign"><img src="signature.png" alt="Sanoop Vaderi Gopalan" width="64" height="40" decoding="async"></footer>
 
@@ -328,7 +382,7 @@ const $=id=>document.getElementById(id);
 const KEY='clinic-supplier-bills-v1';
 let S={bills:[],budget:1000,defDays:90};
 try{const r=localStorage.getItem(KEY);if(r){const p=JSON.parse(r);if(p&&Array.isArray(p.bills))S=Object.assign(S,p)}}catch(e){}
-function norm(){S.bills.forEach(b=>{b.paid=Number(b.paid)||0;if(!Array.isArray(b.pays))b.pays=[]})}norm();
+function norm(){S.bills.forEach(b=>{b.amount=Number(b.amount)||0;b.paid=Number(b.paid)||0;b.days=Number(b.days)||0;if(!Array.isArray(b.pays))b.pays=[]})}norm();
 function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 const inr=n=>'₹'+Math.round(n).toLocaleString('en-IN');
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -435,6 +489,7 @@ function render(){
 /* navigation */
 const TITLES={entry:'New purchase entry',list:'Purchase list',pay:'Payment bill',search:'Search',reports:'Reports',settings:'Settings'};
 function route(){
+  if(!$('modal').hidden)modal(0);
   const v=location.hash.slice(1);const name=TITLES[v]?v:'home';
   document.querySelectorAll('.view').forEach(s=>{s.hidden=s.id!=='v-'+name});
   $('pagehead').hidden=name==='home';$('vtitle').textContent=TITLES[name]||'';
@@ -475,10 +530,76 @@ $('budget').onchange=()=>{S.budget=Number($('budget').value)||0;save();render()}
 $('sdays').onchange=()=>{S.defDays=Math.max(0,Number($('sdays').value)||0);$('days').value=S.defDays;save();render();dueUpd()};
 $('q').oninput=render;$('sq').oninput=render;
 $('viewAll').onclick=()=>{showAll=!showAll;render()};
-function dl(name,text,type){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type}));a.download=name;a.click()}
-$('csv').onclick=()=>{const h='Supplier,Bill no,Bill date,Due date,Amount,Paid,Balance,Receipt numbers,Note\n';dl('supplier-bills.csv',h+S.bills.map(b=>{const i=info(b);return[b.supplier,b.no,b.date,iso(i.due),b.amount,b.paid||0,i.bal,b.pays.map(p=>p.r).filter(Boolean).join('; '),b.notes].map(v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"').join(',')}).join('\n'),'text/csv')};
-$('bak').onclick=()=>dl('supplier-bills-backup.json',JSON.stringify(S),'application/json');
-$('rst').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const p=JSON.parse(r.result);if(Array.isArray(p.bills)){S=Object.assign({budget:1000,defDays:90},p);norm();save();render();toast('Backup restored')}}catch(x){toast('Could not read that file')}};r.readAsText(f)};
+function dl(name,text,type){const u=URL.createObjectURL(new Blob([text],{type})),a=document.createElement('a');a.href=u;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(u),1000)}
+const csvCell=v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"';
+const csvRows=rows=>'\ufeff'+rows.map(r=>r.map(csvCell).join(',')).join('\r\n');
+function exportData(kind){
+  const stamp=iso(new Date());
+  if(kind==='bills'){
+    const rows=[['Supplier','Bill no','Bill date','Credit days','Due date','Amount','Paid','Balance','Status','Receipt numbers','Note']];
+    S.bills.forEach(b=>{const i=info(b);const lbl={paid:'Paid',overdue:'Overdue',soon:'Due soon',open:'Pending'}[i.st];rows.push([b.supplier,b.no,b.date,b.days,iso(i.due),b.amount,b.paid||0,i.bal,lbl,b.pays.map(p=>p.r).filter(Boolean).join('; '),b.notes])});
+    dl('inhaero-bills-'+stamp+'.csv',csvRows(rows),'text/csv;charset=utf-8');
+  }else if(kind==='payments'){
+    const rows=[['Payment date','Supplier','Bill no','Bill amount','Amount paid','Receipt no']];
+    const ev=[];S.bills.forEach(b=>payEvents(b).forEach(p=>ev.push([p.d,b.supplier,b.no,b.amount,p.a,p.r])));
+    ev.sort((a,c)=>a[0]<c[0]?-1:a[0]>c[0]?1:0).forEach(r=>rows.push(r));
+    dl('inhaero-payments-'+stamp+'.csv',csvRows(rows),'text/csv;charset=utf-8');
+  }else if(kind==='suppliers'){
+    const rows=[['Supplier','Bills','Total billed','Paid','Pending']];
+    const sup={};S.bills.forEach(b=>{const g=sup[b.supplier]=sup[b.supplier]||{n:0,a:0,p:0};g.n++;g.a+=b.amount;g.p+=Math.min(b.paid,b.amount)});
+    Object.keys(sup).sort((a,b)=>(sup[b].a-sup[b].p)-(sup[a].a-sup[a].p)||a.localeCompare(b)).forEach(k=>{const g=sup[k];rows.push([k,g.n,g.a,g.p,Math.max(0,g.a-g.p)])});
+    dl('inhaero-suppliers-'+stamp+'.csv',csvRows(rows),'text/csv;charset=utf-8');
+  }else{
+    dl('inhaero-backup-'+stamp+'.json',JSON.stringify(S),'application/json');
+  }
+  toast('Export downloaded');
+}
+document.addEventListener('click',e=>{const x=e.target.closest('[data-exp]');if(x)exportData(x.dataset.exp)});
+/* PIN-locked reset */
+const PIN_HASH='75dedb59f3148146392cab81dd4e8bd071e99a05764f151e5e7caaebc550db0e';
+function sha256(s){
+  const K=[],r=(n,x)=>(n>>>x)|(n<<(32-x));
+  for(let p=2,i=0;i<64;p++){let q=1;for(let d=2;d*d<=p;d++)if(p%d===0){q=0;break}if(q)K[i++]=(Math.pow(p,1/3)%1*2**32)|0}
+  const H=[0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19];
+  const u=[...new TextEncoder().encode(s)],l=u.length*8;u.push(0x80);while((u.length+8)%64)u.push(0);
+  for(let i=7;i>=0;i--)u.push(i<4?(l>>>(i*8))&255:0);
+  for(let i=0;i<u.length;i+=64){
+    const w=[];for(let t=0;t<16;t++)w[t]=(u[i+t*4]<<24)|(u[i+t*4+1]<<16)|(u[i+t*4+2]<<8)|u[i+t*4+3];
+    for(let t=16;t<64;t++){const s0=r(w[t-15],7)^r(w[t-15],18)^(w[t-15]>>>3),s1=r(w[t-2],17)^r(w[t-2],19)^(w[t-2]>>>10);w[t]=(w[t-16]+s0+w[t-7]+s1)|0}
+    let[a,b,c,d,e,f,g,h]=H;
+    for(let t=0;t<64;t++){const S1=r(e,6)^r(e,11)^r(e,25),ch=(e&f)^((~e)&g),t1=(h+S1+ch+K[t]+w[t])|0,S0=r(a,2)^r(a,13)^r(a,22),maj=(a&b)^(a&c)^(b&c),t2=(S0+maj)|0;h=g;g=f;f=e;e=(d+t1)|0;d=c;c=b;b=a;a=(t1+t2)|0}
+    [a,b,c,d,e,f,g,h].forEach((v,k)=>H[k]=(H[k]+v)|0);
+  }
+  return H.map(v=>(v>>>0).toString(16).padStart(8,'0')).join('');
+}
+async function pinOk(v){
+  if(window.crypto&&crypto.subtle){try{const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode('inhaero:'+v));return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')===PIN_HASH}catch(e){}}
+  return sha256('inhaero:'+v)===PIN_HASH;
+}
+let pinTries=0,pinLockUntil=0;
+function modal(step){$('modal').hidden=step===0;$('mStep1').hidden=step!==1;$('mStep2').hidden=step!==2;
+  if(step===1){$('pin').value='';$('pinErr').hidden=true;setTimeout(()=>$('pin').focus(),50)}
+  if(step===2)$('mWarn').textContent='This permanently deletes '+S.bills.length+' bill'+(S.bills.length===1?'':'s')+', all payments and receipt numbers from this device. This cannot be undone.';
+  document.body.style.overflow=step===0?'':'hidden'}
+$('resetBtn').onclick=()=>modal(1);
+$('modal').addEventListener('click',e=>{if(e.target===$('modal')||e.target.closest('[data-close]'))modal(0)});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('modal').hidden)modal(0)});
+async function tryPin(){
+  const now=Date.now();
+  if(now<pinLockUntil){$('pinErr').textContent='Too many attempts. Try again in '+Math.ceil((pinLockUntil-now)/1000)+'s.';$('pinErr').hidden=false;return}
+  if(await pinOk($('pin').value.trim())){pinTries=0;modal(2)}
+  else{pinTries++;$('pin').value='';if(pinTries>=5){pinLockUntil=Date.now()+30000;pinTries=0;$('pinErr').textContent='Too many attempts. Locked for 30 seconds.'}else $('pinErr').textContent='Wrong PIN. Try again.';$('pinErr').hidden=false}
+}
+$('pinOk').onclick=tryPin;
+$('pin').addEventListener('keydown',e=>{if(e.key==='Enter')tryPin()});
+$('pin').addEventListener('input',()=>{$('pin').value=$('pin').value.replace(/\D/g,'')});
+$('doReset').onclick=()=>{
+  try{localStorage.removeItem(KEY)}catch(e){}
+  S={bills:[],budget:1000,defDays:90};showAll=false;listF='pending';srchF='pending';pinTries=0;pinLockUntil=0;
+  $('days').value=S.defDays;$('date').value=iso(new Date());['supplier','no','amount','notes'].forEach(k=>$(k).value='');$('rst').value='';
+  modal(0);render();dueUpd();toast('All data cleared');
+};
+$('rst').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const p=JSON.parse(r.result);if(Array.isArray(p.bills)){S=Object.assign({budget:1000,defDays:90},p);norm();save();render();toast('Backup restored')}}catch(x){toast('Could not read that file')}$('rst').value=''};r.readAsText(f)};
 let lastDay=iso(new Date());
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&iso(new Date())!==lastDay){lastDay=iso(new Date());render()}});
 route();
