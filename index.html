@@ -17,7 +17,13 @@ h1{font-size:1.5rem;margin:4px 0 0;letter-spacing:-.01em}
 h2{font-size:1.05rem;margin:0 0 10px}
 .sub{color:var(--mute);margin:0;font-size:.92rem}
 .panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px}
-.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.stat.ok b{color:var(--ok)}
+.sbox{border:1px solid var(--line);border-radius:10px;padding:12px;margin-top:10px;background:var(--bg)}
+.sbox:first-of-type{margin-top:0}
+.shead{display:flex;justify-content:space-between;gap:8px;align-items:baseline;flex-wrap:wrap;margin-bottom:6px}
+.sline{display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-top:1px solid var(--line);font-size:.92rem}
+.sline .no{overflow-wrap:anywhere}
 .stat{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px}
 .stat b{display:block;font-size:1.25rem;font-variant-numeric:tabular-nums}
 .stat span{font-size:.8rem;color:var(--mute)}
@@ -49,7 +55,8 @@ td:last-child,th:last-child{text-align:right;font-variant-numeric:tabular-nums}
 .empty{color:var(--mute);margin:6px 0}
 .mark{position:fixed;right:12px;bottom:calc(10px + env(safe-area-inset-bottom,0px));display:flex;align-items:center;gap:6px;font-size:.75rem;color:var(--mute);opacity:.8;background:var(--surface);border:1px solid var(--line);border-radius:99px;padding:4px 10px 4px 6px;pointer-events:none}
 .mark svg{width:18px;height:18px}
-@media (max-width:420px){.stats{grid-template-columns:1fr}}
+@media (max-width:620px){.stats{grid-template-columns:repeat(2,1fr)}}
+@media (max-width:360px){.stats{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -62,6 +69,7 @@ td:last-child,th:last-child{text-align:right;font-variant-numeric:tabular-nums}
 
   <section class="stats" aria-label="Summary">
     <div class="stat"><b id="sPending">₹0</b><span>Total pending</span></div>
+    <div class="stat ok"><b id="sPaid">₹0</b><span>Total paid</span></div>
     <div class="stat bad"><b id="sOver">₹0</b><span>Overdue</span></div>
     <div class="stat warn"><b id="sSoon">₹0</b><span>Due in 7 days</span></div>
   </section>
@@ -100,8 +108,9 @@ td:last-child,th:last-child{text-align:right;font-variant-numeric:tabular-nums}
   </section>
 
   <section class="panel">
-    <h2>Pending by supplier</h2>
-    <div class="scroll"><table><thead><tr><th>Supplier</th><th>Bills</th><th>Pending</th></tr></thead><tbody id="sup"></tbody></table></div>
+    <h2>Supplier-wise bills</h2>
+    <label style="margin-bottom:10px">Show<select id="sflt2"><option value="pending">Pending bills only</option><option value="all">All bills</option></select></label>
+    <div id="sup"></div>
   </section>
 
   <section class="panel row">
@@ -138,10 +147,9 @@ function info(b){
 }
 function render(){
   $('budget').value=S.budget;
-  let pend=0,over=0,soon=0;
-  const sup={};
-  S.bills.forEach(b=>{const i=info(b);if(i.bal>0){pend+=i.bal;if(i.st==='overdue')over+=i.bal;if(i.st==='soon')soon+=i.bal;(sup[b.supplier]=sup[b.supplier]||{n:0,t:0}).n++;sup[b.supplier].t+=i.bal}});
-  $('sPending').textContent=inr(pend);$('sOver').textContent=inr(over);$('sSoon').textContent=inr(soon);
+  let pend=0,over=0,soon=0,paidT=0;
+  S.bills.forEach(b=>{const i=info(b);paidT+=Math.min(b.paid||0,b.amount);if(i.bal>0){pend+=i.bal;if(i.st==='overdue')over+=i.bal;if(i.st==='soon')soon+=i.bal}});
+  $('sPending').textContent=inr(pend);$('sPaid').textContent=inr(paidT);$('sOver').textContent=inr(over);$('sSoon').textContent=inr(soon);
   // plan
   let rest=Number(S.budget)||0,html='',tot=0;
   const open=S.bills.map(b=>({b,i:info(b)})).filter(x=>x.i.bal>0).sort((a,c)=>a.i.due-c.i.due);
@@ -158,7 +166,12 @@ function render(){
     return `<div class="bill"><div class="top"><div><b>${esc(b.supplier)}</b><div class="meta">Bill ${esc(b.no||'–')} · dated ${fmt(b.date)} · due ${fmt(iso(i.due))}</div></div><span class="tag ${i.st}">${label}</span></div>
     <div class="meta">Amount ${inr(b.amount)} · paid ${inr(b.paid||0)} · <b>balance ${inr(i.bal)}</b>${b.notes?' · '+esc(b.notes):''}</div>
     <div class="payrow">${i.bal>0?`<input type="number" min="0" inputmode="decimal" placeholder="Amount paid" id="p-${b.id}"><button type="button" data-pay="${b.id}">Record payment</button>`:''}<button type="button" class="ghost" data-del="${b.id}">Delete</button></div></div>`}).join(''):'<p class="empty">Nothing to show here.</p>';
-  $('sup').innerHTML=Object.keys(sup).sort((a,b)=>sup[b].t-sup[a].t).map(k=>`<tr><td>${esc(k)}</td><td>${sup[k].n}</td><td>${inr(sup[k].t)}</td></tr>`).join('')||'<tr><td colspan="3" class="empty">No pending bills.</td></tr>';
+  const onlyPend=$('sflt2').value==='pending';
+  const groups={};
+  S.bills.forEach(b=>{const i=info(b);if(onlyPend&&i.bal<=0)return;(groups[b.supplier]=groups[b.supplier]||{bills:[],pend:0,amt:0}).bills.push({b,i});groups[b.supplier].pend+=i.bal;groups[b.supplier].amt+=b.amount});
+  $('sup').innerHTML=Object.keys(groups).sort((a,b)=>groups[b].pend-groups[a].pend||a.localeCompare(b)).map(k=>{const g=groups[k];
+    return `<div class="sbox"><div class="shead"><b>${esc(k)}</b><span class="meta">${g.bills.length} bill${g.bills.length>1?'s':''} · billed ${inr(g.amt)} · <b>pending ${inr(g.pend)}</b></span></div>`+
+    g.bills.sort((x,y)=>x.i.due-y.i.due).map(({b,i})=>`<div class="sline"><span class="no">Bill ${esc(b.no||'–')} <span class="meta">· ${fmt(b.date)}</span></span><span class="amt">${inr(b.amount)}${i.bal<=0?' <span class="tag paid">paid</span>':(b.paid>0?' <span class="meta">(bal '+inr(i.bal)+')</span>':'')}</span></div>`).join('')+`</div>`}).join('')||'<p class="empty">No bills yet.</p>';
   $('sups').innerHTML=[...new Set(S.bills.map(b=>b.supplier))].map(s=>`<option value="${esc(s)}">`).join('');
 }
 $('date').value=iso(new Date());
@@ -174,7 +187,7 @@ $('list').onclick=e=>{
   if(d&&confirm('Delete this bill?')){S.bills=S.bills.filter(x=>x.id!==d);save();render()}
 };
 $('budget').onchange=()=>{S.budget=Number($('budget').value)||0;save();render()};
-$('flt').onchange=render;$('q').oninput=render;
+$('flt').onchange=render;$('q').oninput=render;$('sflt2').onchange=render;
 function dl(name,text,type){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type}));a.download=name;a.click()}
 $('csv').onclick=()=>{const h='Supplier,Bill no,Bill date,Due date,Amount,Paid,Balance,Note\n';dl('supplier-bills.csv',h+S.bills.map(b=>{const i=info(b);return[b.supplier,b.no,b.date,iso(i.due),b.amount,b.paid||0,i.bal,b.notes].map(v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"').join(',')}).join('\n'),'text/csv')};
 $('bak').onclick=()=>dl('supplier-bills-backup.json',JSON.stringify(S),'application/json');
