@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Clinic Supplier Bills</title>
+<style>
+:root{--bg:#eef3f3;--surface:#fff;--ink:#12292b;--mute:#5d7274;--line:#d3dedf;--brand:#0f5c57;--brand-ink:#fff;--warn:#a65f00;--warn-bg:#fff1d6;--bad:#b3261e;--bad-bg:#fde4e1;--ok:#1d6b3a;--ok-bg:#dff3e5;
+color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0e1b1c;--surface:#152728;--ink:#e3eeee;--mute:#93a9ab;--line:#264244;--brand:#4fb8ae;--brand-ink:#06201e;--warn:#f0b04d;--warn-bg:#3a2a0c;--bad:#ff8a80;--bad-bg:#3d1a17;--ok:#7fd69b;--ok-bg:#12301d;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0e1b1c;--surface:#152728;--ink:#e3eeee;--mute:#93a9ab;--line:#264244;--brand:#4fb8ae;--brand-ink:#06201e;--warn:#f0b04d;--warn-bg:#3a2a0c;--bad:#ff8a80;--bad-bg:#3d1a17;--ok:#7fd69b;--ok-bg:#12301d;color-scheme:dark}
+*{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding:16px 16px 72px}
+main{max-width:760px;margin:0 auto;display:grid;gap:16px}
+h1{font-size:1.5rem;margin:4px 0 0;letter-spacing:-.01em}
+h2{font-size:1.05rem;margin:0 0 10px}
+.sub{color:var(--mute);margin:0;font-size:.92rem}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px}
+.stat b{display:block;font-size:1.25rem;font-variant-numeric:tabular-nums}
+.stat span{font-size:.8rem;color:var(--mute)}
+.stat.bad b{color:var(--bad)}.stat.warn b{color:var(--warn)}
+label{display:grid;gap:4px;font-size:.85rem;color:var(--mute)}
+input,select,button{font:inherit;color:var(--ink)}
+input,select{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:9px 10px;width:100%;min-width:0}
+button{background:var(--brand);color:var(--brand-ink);border:0;border-radius:8px;padding:9px 14px;font-weight:600;cursor:pointer}
+button.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
+button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.grid .full{grid-column:1/-1}
+summary{cursor:pointer;font-weight:600;font-size:1.05rem}
+.row{display:flex;gap:8px;align-items:end;flex-wrap:wrap}
+.pay-item{display:flex;justify-content:space-between;gap:8px;padding:8px 0;border-top:1px solid var(--line)}
+.pay-item:first-of-type{border-top:0}
+.amt{font-variant-numeric:tabular-nums;font-weight:600;white-space:nowrap}
+.bill{border-top:1px solid var(--line);padding:12px 0;display:grid;gap:6px}
+.bill:first-child{border-top:0}
+.top{display:flex;justify-content:space-between;gap:8px}
+.tag{font-size:.75rem;padding:2px 8px;border-radius:99px;font-weight:600;white-space:nowrap}
+.tag.overdue{background:var(--bad-bg);color:var(--bad)}.tag.soon{background:var(--warn-bg);color:var(--warn)}.tag.paid{background:var(--ok-bg);color:var(--ok)}.tag.open{background:var(--bg);color:var(--mute)}
+.meta{font-size:.85rem;color:var(--mute)}
+.payrow{display:flex;gap:8px}.payrow input{max-width:130px}
+.scroll{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:.92rem}
+td,th{padding:7px 6px;text-align:left;border-top:1px solid var(--line)}
+td:last-child,th:last-child{text-align:right;font-variant-numeric:tabular-nums}
+.empty{color:var(--mute);margin:6px 0}
+.mark{position:fixed;right:12px;bottom:calc(10px + env(safe-area-inset-bottom,0px));display:flex;align-items:center;gap:6px;font-size:.75rem;color:var(--mute);opacity:.8;background:var(--surface);border:1px solid var(--line);border-radius:99px;padding:4px 10px 4px 6px;pointer-events:none}
+.mark svg{width:18px;height:18px}
+@media (max-width:420px){.stats{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Supplier bills</h1>
+    <p class="sub">Enter every supplier bill on the day it arrives. The page shows what is due and what to pay today.</p>
+  </header>
+
+  <section class="stats" aria-label="Summary">
+    <div class="stat"><b id="sPending">₹0</b><span>Total pending</span></div>
+    <div class="stat bad"><b id="sOver">₹0</b><span>Overdue</span></div>
+    <div class="stat warn"><b id="sSoon">₹0</b><span>Due in 7 days</span></div>
+  </section>
+
+  <section class="panel">
+    <h2>Pay today</h2>
+    <div class="row">
+      <label style="max-width:180px">Daily payment budget (₹)<input id="budget" type="number" min="0" inputmode="numeric"></label>
+    </div>
+    <div id="plan"></div>
+  </section>
+
+  <details class="panel" open>
+    <summary>Add a bill</summary>
+    <form id="f" onsubmit="return false" style="margin-top:12px">
+      <div class="grid">
+        <label class="full">Supplier<input id="supplier" list="sups" autocomplete="off" required></label>
+        <datalist id="sups"></datalist>
+        <label>Bill number<input id="no"></label>
+        <label>Bill amount (₹)<input id="amount" type="number" min="0" step="0.01" inputmode="decimal"></label>
+        <label>Bill date<input id="date" type="date"></label>
+        <label>Credit days<input id="days" type="number" min="0" inputmode="numeric" value="90"></label>
+        <label class="full">Note<input id="notes" placeholder="Products, doctor, anything to identify the bill"></label>
+        <div class="full"><button id="add" type="button">Save bill</button> <span id="msg" class="meta"></span></div>
+      </div>
+    </form>
+  </details>
+
+  <section class="panel">
+    <h2>Bills</h2>
+    <div class="grid" style="margin-bottom:8px">
+      <label>Show<select id="flt"><option value="pending">Pending</option><option value="overdue">Overdue</option><option value="paid">Paid</option><option value="all">All</option></select></label>
+      <label>Search<input id="q" placeholder="Supplier or bill no."></label>
+    </div>
+    <div id="list"></div>
+  </section>
+
+  <section class="panel">
+    <h2>Pending by supplier</h2>
+    <div class="scroll"><table><thead><tr><th>Supplier</th><th>Bills</th><th>Pending</th></tr></thead><tbody id="sup"></tbody></table></div>
+  </section>
+
+  <section class="panel row">
+    <button class="ghost" id="csv" type="button">Download CSV</button>
+    <button class="ghost" id="bak" type="button">Download backup</button>
+    <label style="flex:1;min-width:160px">Restore backup<input id="rst" type="file" accept=".json"></label>
+    <p class="meta" style="flex-basis:100%;margin:0">Data is saved in this browser only. Download a backup regularly.</p>
+  </section>
+</main>
+
+<div class="mark" aria-label="Made for Sanoop Vaderi Gopalan">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M8 15c1-5 3-7 5-7s1 3-1 6 1 2 4-3"/></svg>
+  Sanoop Vaderi Gopalan
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const KEY='clinic-supplier-bills-v1';
+let S={bills:[],budget:1000};
+try{const r=localStorage.getItem(KEY);if(r){const p=JSON.parse(r);if(p&&Array.isArray(p.bills))S=p}}catch(e){}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+const inr=n=>'₹'+Math.round(n).toLocaleString('en-IN');
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const today=()=>{const d=new Date();d.setHours(0,0,0,0);return d};
+const iso=d=>{const z=new Date(d.getTime()-d.getTimezoneOffset()*6e4);return z.toISOString().slice(0,10)};
+const fmt=s=>{const d=new Date(s+'T00:00:00');return d.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})};
+function info(b){
+  const due=new Date(b.date+'T00:00:00');due.setDate(due.getDate()+Number(b.days||0));
+  const left=Math.round((due-today())/864e5);
+  const bal=Math.max(0,b.amount-(b.paid||0));
+  let st='open';
+  if(bal<=0)st='paid';else if(left<0)st='overdue';else if(left<=7)st='soon';
+  return{due,left,bal,st};
+}
+function render(){
+  $('budget').value=S.budget;
+  let pend=0,over=0,soon=0;
+  const sup={};
+  S.bills.forEach(b=>{const i=info(b);if(i.bal>0){pend+=i.bal;if(i.st==='overdue')over+=i.bal;if(i.st==='soon')soon+=i.bal;(sup[b.supplier]=sup[b.supplier]||{n:0,t:0}).n++;sup[b.supplier].t+=i.bal}});
+  $('sPending').textContent=inr(pend);$('sOver').textContent=inr(over);$('sSoon').textContent=inr(soon);
+  // plan
+  let rest=Number(S.budget)||0,html='',tot=0;
+  const open=S.bills.map(b=>({b,i:info(b)})).filter(x=>x.i.bal>0).sort((a,c)=>a.i.due-c.i.due);
+  for(const x of open){if(rest<=0)break;const a=Math.min(rest,x.i.bal);rest-=a;tot+=a;
+    html+=`<div class="pay-item"><div>${esc(x.b.supplier)}<div class="meta">Bill ${esc(x.b.no||'–')} · ${x.i.left<0?Math.abs(x.i.left)+' days overdue':'due '+fmt(iso(x.i.due))}</div></div><div class="amt">${inr(a)}</div></div>`}
+  $('plan').innerHTML=open.length?html+`<div class="pay-item"><b>Total today</b><b class="amt">${inr(tot)}</b></div>`:'<p class="empty">No pending bills. Add a bill to build today’s payment list.</p>';
+  // list
+  const f=$('flt').value,q=$('q').value.trim().toLowerCase();
+  const rows=S.bills.map(b=>({b,i:info(b)})).filter(x=>{
+    if(f==='pending'&&x.i.bal<=0)return false;if(f==='overdue'&&x.i.st!=='overdue')return false;if(f==='paid'&&x.i.bal>0)return false;
+    return !q||(x.b.supplier+' '+(x.b.no||'')).toLowerCase().includes(q)}).sort((a,c)=>a.i.due-c.i.due);
+  $('list').innerHTML=rows.length?rows.map(({b,i})=>{
+    const label={overdue:i.left*-1+' days overdue',soon:'due in '+i.left+' days',paid:'paid',open:'due in '+i.left+' days'}[i.st];
+    return `<div class="bill"><div class="top"><div><b>${esc(b.supplier)}</b><div class="meta">Bill ${esc(b.no||'–')} · dated ${fmt(b.date)} · due ${fmt(iso(i.due))}</div></div><span class="tag ${i.st}">${label}</span></div>
+    <div class="meta">Amount ${inr(b.amount)} · paid ${inr(b.paid||0)} · <b>balance ${inr(i.bal)}</b>${b.notes?' · '+esc(b.notes):''}</div>
+    <div class="payrow">${i.bal>0?`<input type="number" min="0" inputmode="decimal" placeholder="Amount paid" id="p-${b.id}"><button type="button" data-pay="${b.id}">Record payment</button>`:''}<button type="button" class="ghost" data-del="${b.id}">Delete</button></div></div>`}).join(''):'<p class="empty">Nothing to show here.</p>';
+  $('sup').innerHTML=Object.keys(sup).sort((a,b)=>sup[b].t-sup[a].t).map(k=>`<tr><td>${esc(k)}</td><td>${sup[k].n}</td><td>${inr(sup[k].t)}</td></tr>`).join('')||'<tr><td colspan="3" class="empty">No pending bills.</td></tr>';
+  $('sups').innerHTML=[...new Set(S.bills.map(b=>b.supplier))].map(s=>`<option value="${esc(s)}">`).join('');
+}
+$('date').value=iso(new Date());
+$('add').onclick=()=>{
+  const supplier=$('supplier').value.trim(),amount=parseFloat($('amount').value),date=$('date').value;
+  if(!supplier||!(amount>0)||!date){$('msg').textContent='Enter supplier, amount and bill date.';return}
+  S.bills.push({id:Date.now().toString(36)+Math.random().toString(36).slice(2,5),supplier,no:$('no').value.trim(),amount,date,days:Number($('days').value)||0,notes:$('notes').value.trim(),paid:0});
+  save();['supplier','no','amount','notes'].forEach(k=>$(k).value='');$('msg').textContent='Bill saved.';render();
+};
+$('list').onclick=e=>{
+  const p=e.target.dataset.pay,d=e.target.dataset.del;
+  if(p){const v=parseFloat($('p-'+p).value);if(!(v>0))return;const b=S.bills.find(x=>x.id===p);b.paid=(b.paid||0)+v;save();render()}
+  if(d&&confirm('Delete this bill?')){S.bills=S.bills.filter(x=>x.id!==d);save();render()}
+};
+$('budget').onchange=()=>{S.budget=Number($('budget').value)||0;save();render()};
+$('flt').onchange=render;$('q').oninput=render;
+function dl(name,text,type){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type}));a.download=name;a.click()}
+$('csv').onclick=()=>{const h='Supplier,Bill no,Bill date,Due date,Amount,Paid,Balance,Note\n';dl('supplier-bills.csv',h+S.bills.map(b=>{const i=info(b);return[b.supplier,b.no,b.date,iso(i.due),b.amount,b.paid||0,i.bal,b.notes].map(v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"').join(',')}).join('\n'),'text/csv')};
+$('bak').onclick=()=>dl('supplier-bills-backup.json',JSON.stringify(S),'application/json');
+$('rst').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const p=JSON.parse(r.result);if(Array.isArray(p.bills)){S=p;save();render()}}catch(x){}};r.readAsText(f)};
+render();
+</script>
+</body>
+</html>
