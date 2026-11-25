@@ -122,6 +122,9 @@ input[type=file]::file-selector-button{margin-right:12px;border:0;border-radius:
 .bnums{display:flex;justify-content:space-between;font-size:.84rem;color:var(--mute)}
 .bnums b{color:var(--ink)}
 .pay{display:flex;gap:8px}.pay input{min-height:44px}.pay .btn{min-height:44px;white-space:nowrap}
+.payform{display:grid;grid-template-columns:1fr 1fr;gap:8px}.payform input{min-height:44px}.payform .btn{grid-column:1/-1}
+.phist{border-top:1px dashed var(--line);padding-top:8px;display:grid;gap:4px;font-size:.84rem;color:var(--mute)}
+.phist .pl{display:flex;justify-content:space-between;gap:8px}.phist b{color:var(--ink)}
 .acts{display:flex;gap:8px}.acts .btn{flex:1}
 /* supplier boxes */
 .sbox{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px;box-shadow:var(--shadow)}
@@ -343,8 +346,8 @@ function info(b){
 }
 const dueText=i=>i.st==='paid'?'Paid':i.left<0?Math.abs(i.left)+(Math.abs(i.left)===1?' day':' days')+' overdue':i.left===0?'Due today':'Due in '+i.left+(i.left===1?' day':' days');
 function payEvents(b){
-  const sum=b.pays.reduce((a,p)=>a+p.a,0),ev=b.pays.map(p=>({d:p.d,a:p.a}));
-  if(b.paid-sum>0.005)ev.push({d:b.date,a:b.paid-sum});
+  const sum=b.pays.reduce((a,p)=>a+p.a,0),ev=b.pays.map(p=>({d:p.d,a:p.a,r:p.r||''}));
+  if(b.paid-sum>0.005)ev.push({d:b.date,a:b.paid-sum,r:''});
   return ev;
 }
 function toast(m){const t=$('toast');t.textContent=m;t.classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>t.classList.remove('show'),2200)}
@@ -370,7 +373,7 @@ function render(){
     const i=info(b);buy+=b.amount;if(b.date.slice(0,7)===ym)buyM+=b.amount;
     if(i.bal>0){pend+=i.bal;due++;if(i.st==='overdue'){over+=i.bal;nOver++}if(i.st==='overdue'||i.st==='soon')attn.push({b,i})}
     acts.push({d:b.created||b.date,seq:n*2,k:'buy',t:b.supplier,sub:'Purchase'+(b.no?' · Bill '+b.no:''),a:b.amount,s:i.bal<=0?'Paid':'Pending'});
-    payEvents(b).forEach((p,k)=>{paid+=p.a;if(p.d.slice(0,7)===ym)paidM+=p.a;acts.push({d:p.d,seq:n*2+1+k/100,k:'pay',t:b.supplier,sub:'Payment'+(b.no?' · Bill '+b.no:''),a:p.a,s:'Paid'})});
+    payEvents(b).forEach((p,k)=>{paid+=p.a;if(p.d.slice(0,7)===ym)paidM+=p.a;acts.push({d:p.d,seq:n*2+1+k/100,k:'pay',t:b.supplier,sub:'Payment'+(b.no?' · Bill '+b.no:'')+(p.r?' · Receipt '+p.r:''),a:p.a,s:'Paid'})});
   });
   const h=new Date().getHours();
   $('greet').textContent=(h<12?'Good morning':h<17?'Good afternoon':'Good evening');
@@ -395,7 +398,7 @@ function render(){
   let rest=Number(S.budget)||0,tot=0,html='';
   const open=S.bills.map(b=>({b,i:info(b)})).filter(x=>x.i.bal>0).sort((a,c)=>a.i.due-c.i.due);
   for(const x of open){if(rest<=0)break;const a=Math.min(rest,x.i.bal);rest-=a;tot+=a;
-    html+=`<div class="bcard ${x.i.st}"><div class="btop"><div><b>${esc(x.b.supplier)}</b><div class="meta">Bill ${esc(x.b.no||'–')} · ${dueText(x.i)}</div></div><div class="amt">${inr(a)}<small>${a<x.i.bal?'of '+inr(x.i.bal):'full balance'}</small></div></div><button class="btn ok sm" type="button" data-plan="${x.b.id}|${a}"><svg class="i"><use href="#i-check"/></svg>Mark ${inr(a)} as paid</button></div>`}
+    html+=`<div class="bcard ${x.i.st}"><div class="btop"><div><b>${esc(x.b.supplier)}</b><div class="meta">Bill ${esc(x.b.no||'–')} · ${dueText(x.i)}</div></div><div class="amt">${inr(a)}<small>${a<x.i.bal?'of '+inr(x.i.bal):'full balance'}</small></div></div><input id="pr-${x.b.id}" placeholder="Receipt no. (optional)" style="min-height:44px"><button class="btn ok sm" type="button" data-plan="${x.b.id}|${a}"><svg class="i"><use href="#i-check"/></svg>Mark ${inr(a)} as paid</button></div>`}
   $('planTot').textContent=inr(tot);
   $('plan').innerHTML=open.length?html:`<div class="card">${empty('check','No pending bills to pay.')}</div>`;
   // list
@@ -411,7 +414,8 @@ function render(){
     <div class="bar"><i style="width:${pc}%"></i></div>
     <div class="bnums"><span>Amount <b>${inr(b.amount)}</b></span><span>Paid <b>${inr(b.paid||0)}</b></span><span>Balance <b>${inr(i.bal)}</b></span></div>
     <div class="meta">Due ${fmt(iso(i.due))}${b.notes?' · '+esc(b.notes):''}</div>
-    ${i.bal>0?`<div class="pay"><span class="money" style="flex:1"><input type="number" min="0" inputmode="decimal" placeholder="Amount paid" id="p-${b.id}"></span><button class="btn sm" type="button" data-pay="${b.id}">Record</button></div>`:''}
+    ${b.pays.length?'<div class="phist">'+b.pays.map(p=>`<div class="pl"><span>${fmtShort(p.d)}${p.r?' · Receipt <b>'+esc(p.r)+'</b>':''}</span><span>${inr(p.a)}</span></div>`).join('')+'</div>':''}
+    ${i.bal>0?`<div class="payform"><span class="money"><input type="number" min="0" inputmode="decimal" placeholder="Amount paid" id="p-${b.id}"></span><input id="r-${b.id}" placeholder="Receipt no."><button class="btn sm" type="button" data-pay="${b.id}">Record payment</button></div>`:''}
     <div class="acts"><button class="btn bad sm" type="button" data-del="${b.id}">Delete</button></div></div>`}).join(''):`<div class="card">${empty('inbox','Nothing to show here.')}</div>`;
   // search
   chips($('schips'),[['pending','Pending only'],['all','All bills']],srchF,'data-sf');
@@ -459,20 +463,20 @@ $('add').onclick=()=>{
   S.bills.push({id:Date.now().toString(36)+Math.random().toString(36).slice(2,5),supplier,no:$('no').value.trim(),amount,date,days:Number($('days').value)||0,notes:$('notes').value.trim(),paid:0,pays:[],created:iso(new Date())});
   save();['supplier','no','amount','notes'].forEach(k=>$(k).value='');toast('Bill saved · add the next one');render();$('supplier').focus({preventScroll:true});
 };
-function recordPay(b,v){const bal=info(b).bal;v=Math.min(v,bal);if(!(v>0))return;b.paid=(b.paid||0)+v;b.pays.push({d:iso(new Date()),a:v});save();render();toast(inr(v)+' payment recorded')}
+function recordPay(b,v,r){const bal=info(b).bal;v=Math.min(v,bal);if(!(v>0))return;b.paid=(b.paid||0)+v;b.pays.push({d:iso(new Date()),a:v,r:(r||'').trim()});save();render();toast(inr(v)+' payment recorded')}
 $('list').onclick=e=>{
   const bt=e.target.closest('button');if(!bt)return;
   const p=bt.dataset.pay,d=bt.dataset.del;
-  if(p){const v=parseFloat($('p-'+p).value);if(!(v>0)){toast('Enter the amount paid');return}recordPay(S.bills.find(x=>x.id===p),v)}
+  if(p){const v=parseFloat($('p-'+p).value);if(!(v>0)){toast('Enter the amount paid');return}recordPay(S.bills.find(x=>x.id===p),v,$('r-'+p).value)}
   if(d&&confirm('Delete this bill?')){S.bills=S.bills.filter(x=>x.id!==d);save();render();toast('Bill deleted')}
 };
-$('plan').onclick=e=>{const bt=e.target.closest('[data-plan]');if(!bt)return;const[id,a]=bt.dataset.plan.split('|');const b=S.bills.find(x=>x.id===id);if(b&&confirm('Mark '+inr(Number(a))+' as paid to '+b.supplier+'?'))recordPay(b,Number(a))};
+$('plan').onclick=e=>{const bt=e.target.closest('[data-plan]');if(!bt)return;const[id,a]=bt.dataset.plan.split('|');const b=S.bills.find(x=>x.id===id);if(b&&confirm('Mark '+inr(Number(a))+' as paid to '+b.supplier+'?'))recordPay(b,Number(a),$('pr-'+id).value)};
 $('budget').onchange=()=>{S.budget=Number($('budget').value)||0;save();render()};
 $('sdays').onchange=()=>{S.defDays=Math.max(0,Number($('sdays').value)||0);$('days').value=S.defDays;save();render();dueUpd()};
 $('q').oninput=render;$('sq').oninput=render;
 $('viewAll').onclick=()=>{showAll=!showAll;render()};
 function dl(name,text,type){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type}));a.download=name;a.click()}
-$('csv').onclick=()=>{const h='Supplier,Bill no,Bill date,Due date,Amount,Paid,Balance,Note\n';dl('supplier-bills.csv',h+S.bills.map(b=>{const i=info(b);return[b.supplier,b.no,b.date,iso(i.due),b.amount,b.paid||0,i.bal,b.notes].map(v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"').join(',')}).join('\n'),'text/csv')};
+$('csv').onclick=()=>{const h='Supplier,Bill no,Bill date,Due date,Amount,Paid,Balance,Receipt numbers,Note\n';dl('supplier-bills.csv',h+S.bills.map(b=>{const i=info(b);return[b.supplier,b.no,b.date,iso(i.due),b.amount,b.paid||0,i.bal,b.pays.map(p=>p.r).filter(Boolean).join('; '),b.notes].map(v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"').join(',')}).join('\n'),'text/csv')};
 $('bak').onclick=()=>dl('supplier-bills-backup.json',JSON.stringify(S),'application/json');
 $('rst').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const p=JSON.parse(r.result);if(Array.isArray(p.bills)){S=Object.assign({budget:1000,defDays:90},p);norm();save();render();toast('Backup restored')}}catch(x){toast('Could not read that file')}};r.readAsText(f)};
 let lastDay=iso(new Date());
