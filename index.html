@@ -163,10 +163,14 @@ input[type=file]::file-selector-button{margin-right:12px;border:0;border-radius:
 .phist .pl{display:flex;justify-content:space-between;align-items:center;gap:8px}.phist b{color:var(--ink)}
 .acts{display:flex;gap:8px}.acts .btn{flex:1}
 .mrow[data-rmon]{cursor:pointer;border-radius:12px;padding:10px 8px;transition:background .15s,box-shadow .15s}.mrow.sel{background:var(--soft);box-shadow:inset 0 0 0 1px var(--line)}
+.tog{display:inline-flex;align-items:center;gap:8px;min-height:42px;padding:6px 12px 6px 8px;border-radius:99px;border:1.5px solid var(--line);background:var(--soft);color:var(--mute);font-weight:700;font-size:.84rem;transition:all .15s;flex-shrink:0}
+.tog .tr{position:relative;width:36px;height:20px;border-radius:99px;background:color-mix(in srgb,var(--mute) 35%,transparent);transition:background .15s}
+.tog .tr i{position:absolute;left:2px;top:2px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25);transition:transform .18s}
+.tog.on{border-color:var(--brand);background:color-mix(in srgb,var(--brand) 14%,transparent);color:var(--brand)}
+.tog.on .tr{background:var(--brand)}.tog.on .tr i{transform:translateX(16px)}
 tbody tr[data-rdate]{cursor:pointer;transition:background .15s}
 tbody tr[data-rdate]:hover,tbody tr[data-rdate].sel{background:var(--soft)}
 tbody tr[data-rdate].sel td:first-child{color:var(--brand);font-weight:750}
-.dscroll{max-height:300px;overflow:auto}.dscroll th{position:sticky;top:0;background:var(--surface);z-index:1}
 .dlist{display:grid;gap:8px;margin-top:10px}
 .ditem{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:12px;background:var(--soft);font-size:.86rem}
 .ditem b{font-size:.9rem}
@@ -367,15 +371,20 @@ td:not(:first-child),th:not(:first-child){text-align:right;font-variant-numeric:
     <section class="view" id="v-reports" hidden>
       <div class="card" style="padding:12px 16px">
         <div class="setrow" style="padding:0"><div style="min-width:0"><div style="font-weight:700;font-size:.95rem">Month</div><div class="meta" id="rMonSub">All months</div></div><select id="rMonSel" aria-label="Choose month" style="width:auto;min-width:150px;max-width:190px;flex-shrink:0"></select></div>
-        <div class="setrow" style="padding-bottom:0"><div style="flex:1;min-width:0"><div style="font-weight:700;font-size:.95rem">Date</div><div class="meta" id="rDateSub">All dates</div></div><div style="display:flex;gap:6px;align-items:center;min-width:0;flex-shrink:0"><input id="rDateSel" type="date" aria-label="Choose date" style="width:146px;min-width:0;min-height:44px;padding:8px 10px"><button class="btn ghost sm" id="rDateClr" type="button" hidden style="min-height:44px;padding:8px 10px">All</button></div></div>
+        <div class="setrow" style="padding-bottom:0"><div style="flex:1;min-width:0"><div style="font-weight:700;font-size:.95rem">Date-wise report</div><div class="meta" id="rDateTogSub">Show all date-by-date results</div></div><button class="tog" id="rDateTog" type="button" role="switch" aria-checked="false" aria-label="Toggle date-wise report"><span class="tr"><i></i></span><span id="rDateTogTxt">Off</span></button></div>
       </div>
       <div class="k3">
         <div class="kpi"><span>Billed</span><b id="rBill">₹0</b></div>
         <div class="kpi"><span>Paid</span><b id="rPaid">₹0</b></div>
         <div class="kpi"><span>Pending</span><b id="rPend">₹0</b></div>
       </div>
-      <div class="card" id="rDayBox" hidden><div class="sec"><h2 id="rDayH">Date activity</h2><span class="meta" id="rDayMeta"></span></div><div class="dlist" id="rDayList"></div></div>
-      <div class="card"><div class="sec" style="margin-bottom:6px"><h2 id="rDateH">Date-wise</h2><span class="meta">Tap date to filter</span></div><div class="scroll dscroll"><table><thead><tr><th>Date</th><th>Billed</th><th>Paid</th><th>Pending</th></tr></thead><tbody id="rDates"></tbody></table></div></div>
+      <div id="rDateSec" hidden style="display:grid;gap:16px">
+        <div class="card" style="padding:12px 16px">
+          <div class="setrow" style="padding:0"><div style="flex:1;min-width:0"><div style="font-weight:700;font-size:.95rem">Choose date</div><div class="meta" id="rDateSub">All dates</div></div><div style="display:flex;gap:6px;align-items:center;min-width:0;flex-shrink:0"><input id="rDateSel" type="date" aria-label="Choose date" style="width:146px;min-width:0;min-height:44px;padding:8px 10px"><button class="btn ghost sm" id="rDateClr" type="button" hidden style="min-height:44px;padding:8px 10px">All</button></div></div>
+        </div>
+        <div class="card" id="rDayBox" hidden><div class="sec"><h2 id="rDayH">Date activity</h2><span class="meta" id="rDayMeta"></span></div><div class="dlist" id="rDayList"></div></div>
+        <div class="card"><div class="sec" style="margin-bottom:6px"><h2 id="rDateH">Date-wise</h2><span class="meta">Tap date to filter</span></div><div class="scroll"><table><thead><tr><th>Date</th><th>Billed</th><th>Paid</th><th>Pending</th></tr></thead><tbody id="rDates"></tbody></table></div></div>
+      </div>
       <div class="card"><div class="sec"><h2>Month-wise</h2><span class="meta"><span style="color:#3b82f6">●</span> Purchases &nbsp;<span style="color:#22c55e">●</span> Payments</span></div><div id="rMonth"></div></div>
       <div class="card"><h2 id="rSupH" style="margin-bottom:6px">Supplier-wise</h2><div class="scroll"><table><thead><tr><th>Supplier</th><th>Billed</th><th>Paid</th><th>Pending</th></tr></thead><tbody id="rSup"></tbody></table></div></div>
       <div class="card">
@@ -643,14 +652,19 @@ function render(){
   S.bills.forEach(b=>{const bm=(b.date||'').slice(0,7);if(bm)(mon[bm]=mon[bm]||{p:0,y:0}).p+=b.amount;payEvents(b).forEach(p=>{const pm=(p.d||'').slice(0,7);if(pm)(mon[pm]=mon[pm]||{p:0,y:0}).y+=p.a})});
   const mk=Object.keys(mon).sort().reverse(),mx=Math.max(1,...mk.map(k=>Math.max(mon[k].p,mon[k].y)));
   const mFmt=(k,s)=>new Date(k+'-01T00:00:00').toLocaleDateString('en-GB',{month:s?'short':'long',year:'numeric'});
-  const mSel=$('rMonSel'),dSel=$('rDateSel');
-  let curDate=dSel.value||'',curMon=mSel.dataset.val||'';
+  const mSel=$('rMonSel'),dSel=$('rDateSel'),dTog=$('rDateTog'),dOn=dTog.dataset.on==='1';
+  if(!dOn)dSel.value='';
+  let curDate=dOn?(dSel.value||''):'',curMon=mSel.dataset.val||'';
   if(curDate&&curMon&&!curDate.startsWith(curMon))curMon=mon[curDate.slice(0,7)]?curDate.slice(0,7):'';
   if(curMon&&!mon[curMon])curMon='';
   mSel.dataset.val=curMon;
   mSel.innerHTML='<option value="">All months</option>'+mk.map(k=>`<option value="${k}">${mFmt(k)}</option>`).join('');
   mSel.value=curMon;
   $('rMonSub').textContent=curMon?mFmt(curMon):'All months';
+  dTog.classList.toggle('on',dOn);dTog.setAttribute('aria-checked',dOn?'true':'false');
+  $('rDateTogTxt').textContent=dOn?'On':'Off';
+  $('rDateTogSub').textContent=dOn?(curDate?fmt(curDate):'Showing all dates'+(curMon?' in '+mFmt(curMon,1):'')):'Show all date-by-date results';
+  $('rDateSec').hidden=!dOn;
   $('rDateSub').textContent=curDate?fmt(curDate):'All dates';
   $('rDateClr').hidden=!curDate;
   const fPrefix=curDate||curMon||'';
@@ -660,17 +674,19 @@ function render(){
   let rBuy=buy,rPaid=paid,rPend=pend;
   if(fPrefix){rBuy=0;rPaid=0;rPend=0;Object.values(sup).forEach(g=>{rBuy+=g.a;rPaid+=g.p;rPend+=g.pend})}
   $('rBill').textContent=inr(rBuy);$('rPaid').textContent=inr(rPaid);$('rPend').textContent=inr(rPend);
-  $('rDayBox').hidden=!curDate;
-  if(curDate){
+  $('rDayBox').hidden=!dOn||!curDate;
+  if(dOn&&curDate){
     const dayB=S.bills.filter(b=>b.date===curDate),dayP=[];
     S.bills.forEach(b=>payEvents(b).forEach(p=>{if(p.d===curDate)dayP.push({b,p})}));
     $('rDayH').textContent='Activity · '+fmt(curDate);
     $('rDayMeta').textContent=dayB.length+' bill'+(dayB.length===1?'':'s')+' · '+dayP.length+' paid';
-    $('rDayList').innerHTML=(dayB.map(b=>{const i=info(b);return `<div class="ditem"><div style="min-width:0"><b>${esc(b.supplier)}</b> <span class="tag ${i.st}">${i.st==='paid'?'Paid':'Bill'}</span><div class="meta">Bill ${esc(b.no||'–')} · ${dueText(i)}${b.img?` · <button type="button" class="pthumb" data-bimg="${b.id}"><svg class="i"><use href="#i-cam"/></svg>Photo</button>`:''}</div></div><div style="text-align:right;white-space:nowrap"><b>${inr(b.amount)}</b>${i.bal>0&&b.paid>0?`<div class="meta">bal ${inr(i.bal)}</div>`:''}</div></div>`}).join('')+
-      dayP.map(({b,p})=>`<div class="ditem"><div style="min-width:0"><b>${esc(b.supplier)}</b> <span class="tag paid">Paid</span><div class="meta">Bill ${esc(b.no||'–')}${p.r?' · RT '+esc(p.r):''}${p.img&&p.idx>=0?` · <button type="button" class="pthumb" data-img="${b.id}|${p.idx}"><svg class="i"><use href="#i-cam"/></svg>Photo</button>`:''}</div></div><div style="text-align:right;white-space:nowrap"><b style="color:var(--green)">+${inr(p.a)}</b></div></div>`).join(''))||`<div class="meta">No bills or payments on ${fmt(curDate)}.</div>`;
+    $('rDayList').innerHTML=(dayB.map(b=>{const i=info(b);return `<div class="ditem"><div style="min-width:0"><b>${esc(b.supplier)}</b> <span class="tag ${i.st}">${i.st==='paid'?'Paid':'Bill'}</span><div class="meta">Bill ${esc(b.no||'–')} · ${dueText(i)}${b.img?` <button type="button" class="pthumb" data-bimg="${b.id}"><svg class="i"><use href="#i-cam"/></svg>Photo</button>`:''}</div></div><div style="text-align:right;white-space:nowrap"><b>${inr(b.amount)}</b>${i.bal>0&&b.paid>0?`<div class="meta">bal ${inr(i.bal)}</div>`:''}</div></div>`}).join('')+
+      dayP.map(({b,p})=>`<div class="ditem"><div style="min-width:0"><b>${esc(b.supplier)}</b> <span class="tag paid">Paid</span><div class="meta">Bill ${esc(b.no||'–')}${p.r?' · RT '+esc(p.r):''}${p.img&&p.idx>=0?` <button type="button" class="pthumb" data-img="${b.id}|${p.idx}"><svg class="i"><use href="#i-cam"/></svg>Photo</button>`:''}</div></div><div style="text-align:right;white-space:nowrap"><b style="color:var(--green)">+${inr(p.a)}</b></div></div>`).join(''))||`<div class="meta">No bills or payments on ${fmt(curDate)}.</div>`;
   }else $('rDayList').innerHTML='';
-  const days=repDates(curMon),dk=Object.keys(days).sort().reverse();
-  $('rDates').innerHTML=dk.map(d=>`<tr class="${curDate===d?'sel':''}" data-rdate="${d}"><td style="white-space:nowrap">${fmt(d)}</td><td>${inr(days[d].a)}</td><td>${inr(days[d].p)}</td><td><b>${inr(days[d].pend)}</b></td></tr>`).join('')||'<tr><td colspan="4" class="meta">'+(curMon?'No dates in '+mFmt(curMon)+'.':'No data yet.')+'</td></tr>';
+  if(dOn){
+    const days=repDates(curMon),dk=Object.keys(days).sort().reverse();
+    $('rDates').innerHTML=dk.map(d=>{const g=days[d],sub=[g.n?g.n+(g.n===1?' bill':' bills'):'',g.np?g.np+' paid':''].filter(Boolean).join(' · ');return `<tr class="${curDate===d?'sel':''}" data-rdate="${d}"><td style="white-space:nowrap">${fmt(d)}${sub?`<div class="meta" style="font-size:.73rem">${sub}</div>`:''}</td><td>${inr(g.a)}</td><td>${inr(g.p)}</td><td><b>${inr(g.pend)}</b></td></tr>`}).join('')||'<tr><td colspan="4" class="meta">'+(curMon?'No dates in '+mFmt(curMon)+'.':'No data yet.')+'</td></tr>';
+  }else $('rDates').innerHTML='';
   $('rMonth').innerHTML=mk.map(k=>`<div class="mrow${curMon===k?' sel':''}" data-rmon="${k}"><div class="h"><span>${mFmt(k)}</span></div><div class="mbar"><i class="b-buy" style="width:${mon[k].p/mx*100}%"></i></div><div class="mbar"><i class="b-pay" style="width:${mon[k].y/mx*100}%"></i></div><div class="mleg"><span>Purchases ${inr(mon[k].p)}</span><span>Payments ${inr(mon[k].y)}</span></div></div>`).join('')||empty('chart','No data yet.');
   $('rSup').innerHTML=Object.keys(sup).sort((a,b)=>sup[b].pend-sup[a].pend||sup[b].a-sup[a].a||a.localeCompare(b)).map(k=>`<tr><td>${esc(k)}</td><td>${inr(sup[k].a)}</td><td>${inr(sup[k].p)}</td><td><b>${inr(sup[k].pend)}</b></td></tr>`).join('')||'<tr><td colspan="4" class="meta">'+(fPrefix?'No data for '+(curDate?fmt(curDate):mFmt(curMon))+'.':'No data yet.')+'</td></tr>';
   $('sdays').value=S.defDays;
@@ -847,7 +863,8 @@ $('qClr').onclick=()=>{$('q').value='';render();$('q').focus()};
 $('viewAll').onclick=()=>{showAll=!showAll;render()};
 $('rMonSel').onchange=()=>{const s=$('rMonSel');s.dataset.val=s.value;$('rDateSel').value='';render()};
 $('rMonth').onclick=e=>{const r=e.target.closest('[data-rmon]');if(!r)return;const s=$('rMonSel');s.dataset.val=(s.dataset.val||'')===r.dataset.rmon?'':r.dataset.rmon;$('rDateSel').value='';render()};
-$('rDateSel').onchange=()=>render();
+$('rDateTog').onclick=()=>{const t=$('rDateTog'),on=t.dataset.on!=='1';t.dataset.on=on?'1':'';if(!on)$('rDateSel').value='';render()};
+$('rDateSel').onchange=()=>{if($('rDateSel').value)$('rDateTog').dataset.on='1';render()};
 $('rDateClr').onclick=()=>{$('rDateSel').value='';render()};
 $('rDates').onclick=e=>{const r=e.target.closest('[data-rdate]');if(!r)return;const d=$('rDateSel');d.value=d.value===r.dataset.rdate?'':r.dataset.rdate;render()};
 function repSuppliers(f){
