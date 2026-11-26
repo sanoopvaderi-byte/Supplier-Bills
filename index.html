@@ -1056,8 +1056,8 @@ function loadXlsx(){
   return new Promise((res,rej)=>{let i=0;const next=()=>{if(window.XLSX){res(window.XLSX);return}if(i>=urls.length){rej(new Error('load'));return}const sc=document.createElement('script');sc.src=urls[i++];sc.onload=()=>window.XLSX?res(window.XLSX):next();sc.onerror=()=>{sc.remove();next()};document.head.appendChild(sc)};next()});
 }
 function parseCsv(txt){
-  const s=String(txt||'').replace(/^\uFEFF/,''),first=s.split(/\r?\n/).find(l=>l.trim())||'';
-  const delim=['\t',';',','].sort((a,b)=>first.split(b).length-first.split(a).length)[0];
+  const s=String(txt||'').replace(/^\uFEFF/,''),head=s.split(/\r?\n/).filter(l=>l.trim()).slice(0,15).join('\n');
+  const delim=['\t',';'].reduce((best,d)=>head.split(d).length>head.split(best).length?d:best,',');
   const rows=[];let row=[],cur='',q=false;
   for(let i=0;i<s.length;i++){
     const ch=s[i];
