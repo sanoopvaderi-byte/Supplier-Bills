@@ -163,6 +163,13 @@ input[type=file]::file-selector-button{margin-right:12px;border:0;border-radius:
 .phist .pl{display:flex;justify-content:space-between;align-items:center;gap:8px}.phist b{color:var(--ink)}
 .acts{display:flex;gap:8px}.acts .btn{flex:1}
 .mrow[data-rmon]{cursor:pointer;border-radius:12px;padding:10px 8px;transition:background .15s,box-shadow .15s}.mrow.sel{background:var(--soft);box-shadow:inset 0 0 0 1px var(--line)}
+tbody tr[data-rdate]{cursor:pointer;transition:background .15s}
+tbody tr[data-rdate]:hover,tbody tr[data-rdate].sel{background:var(--soft)}
+tbody tr[data-rdate].sel td:first-child{color:var(--brand);font-weight:750}
+.dscroll{max-height:300px;overflow:auto}.dscroll th{position:sticky;top:0;background:var(--surface);z-index:1}
+.dlist{display:grid;gap:8px;margin-top:10px}
+.ditem{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:12px;background:var(--soft);font-size:.86rem}
+.ditem b{font-size:.9rem}
 /* supplier boxes */
 .sbox{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px;box-shadow:var(--shadow)}
 .shead{display:flex;align-items:center;gap:12px;margin-bottom:6px}
@@ -358,12 +365,17 @@ td:not(:first-child),th:not(:first-child){text-align:right;font-variant-numeric:
 
     <!-- REPORTS -->
     <section class="view" id="v-reports" hidden>
-      <div class="card" style="padding:12px 16px"><div class="setrow" style="padding:0"><div style="min-width:0"><div style="font-weight:700;font-size:.95rem">Month</div><div class="meta" id="rMonSub">All months</div></div><select id="rMonSel" aria-label="Choose month" style="width:auto;min-width:150px;max-width:190px;flex-shrink:0"></select></div></div>
+      <div class="card" style="padding:12px 16px">
+        <div class="setrow" style="padding:0"><div style="min-width:0"><div style="font-weight:700;font-size:.95rem">Month</div><div class="meta" id="rMonSub">All months</div></div><select id="rMonSel" aria-label="Choose month" style="width:auto;min-width:150px;max-width:190px;flex-shrink:0"></select></div>
+        <div class="setrow" style="padding-bottom:0"><div style="flex:1;min-width:0"><div style="font-weight:700;font-size:.95rem">Date</div><div class="meta" id="rDateSub">All dates</div></div><div style="display:flex;gap:6px;align-items:center;min-width:0;flex-shrink:0"><input id="rDateSel" type="date" aria-label="Choose date" style="width:146px;min-width:0;min-height:44px;padding:8px 10px"><button class="btn ghost sm" id="rDateClr" type="button" hidden style="min-height:44px;padding:8px 10px">All</button></div></div>
+      </div>
       <div class="k3">
         <div class="kpi"><span>Billed</span><b id="rBill">₹0</b></div>
         <div class="kpi"><span>Paid</span><b id="rPaid">₹0</b></div>
         <div class="kpi"><span>Pending</span><b id="rPend">₹0</b></div>
       </div>
+      <div class="card" id="rDayBox" hidden><div class="sec"><h2 id="rDayH">Date activity</h2><span class="meta" id="rDayMeta"></span></div><div class="dlist" id="rDayList"></div></div>
+      <div class="card"><div class="sec" style="margin-bottom:6px"><h2 id="rDateH">Date-wise</h2><span class="meta">Tap date to filter</span></div><div class="scroll dscroll"><table><thead><tr><th>Date</th><th>Billed</th><th>Paid</th><th>Pending</th></tr></thead><tbody id="rDates"></tbody></table></div></div>
       <div class="card"><div class="sec"><h2>Month-wise</h2><span class="meta"><span style="color:#3b82f6">●</span> Purchases &nbsp;<span style="color:#22c55e">●</span> Payments</span></div><div id="rMonth"></div></div>
       <div class="card"><h2 id="rSupH" style="margin-bottom:6px">Supplier-wise</h2><div class="scroll"><table><thead><tr><th>Supplier</th><th>Billed</th><th>Paid</th><th>Pending</th></tr></thead><tbody id="rSup"></tbody></table></div></div>
       <div class="card">
@@ -373,7 +385,8 @@ td:not(:first-child),th:not(:first-child){text-align:right;font-variant-numeric:
           <button class="btn ghost" type="button" data-exp="bills"><svg class="i"><use href="#i-down"/></svg>Bills CSV</button>
           <button class="btn ghost" type="button" data-exp="payments"><svg class="i"><use href="#i-down"/></svg>Payments CSV</button>
           <button class="btn ghost" type="button" data-exp="suppliers"><svg class="i"><use href="#i-down"/></svg>Suppliers CSV</button>
-          <button class="btn ghost" type="button" data-exp="backup"><svg class="i"><use href="#i-down"/></svg>Backup</button>
+          <button class="btn ghost" type="button" data-exp="dates"><svg class="i"><use href="#i-down"/></svg>Date-wise CSV</button>
+          <button class="btn ghost" type="button" data-exp="backup" style="grid-column:1/-1"><svg class="i"><use href="#i-down"/></svg>Backup</button>
         </div>
       </div>
     </section>
@@ -395,7 +408,8 @@ td:not(:first-child),th:not(:first-child){text-align:right;font-variant-numeric:
           <button class="btn ghost" type="button" data-exp="bills"><svg class="i"><use href="#i-down"/></svg>Bills CSV</button>
           <button class="btn ghost" type="button" data-exp="payments"><svg class="i"><use href="#i-down"/></svg>Payments CSV</button>
           <button class="btn ghost" type="button" data-exp="suppliers"><svg class="i"><use href="#i-down"/></svg>Suppliers CSV</button>
-          <button class="btn ghost" type="button" data-exp="backup"><svg class="i"><use href="#i-down"/></svg>Full backup</button>
+          <button class="btn ghost" type="button" data-exp="dates"><svg class="i"><use href="#i-down"/></svg>Date-wise CSV</button>
+          <button class="btn ghost" type="button" data-exp="backup" style="grid-column:1/-1"><svg class="i"><use href="#i-down"/></svg>Full backup</button>
         </div>
       </div>
       <div class="card">
@@ -629,17 +643,36 @@ function render(){
   S.bills.forEach(b=>{const bm=(b.date||'').slice(0,7);if(bm)(mon[bm]=mon[bm]||{p:0,y:0}).p+=b.amount;payEvents(b).forEach(p=>{const pm=(p.d||'').slice(0,7);if(pm)(mon[pm]=mon[pm]||{p:0,y:0}).y+=p.a})});
   const mk=Object.keys(mon).sort().reverse(),mx=Math.max(1,...mk.map(k=>Math.max(mon[k].p,mon[k].y)));
   const mFmt=(k,s)=>new Date(k+'-01T00:00:00').toLocaleDateString('en-GB',{month:s?'short':'long',year:'numeric'});
-  const mSel=$('rMonSel');let curMon=mSel.dataset.val||'';if(curMon&&!mon[curMon]){curMon='';mSel.dataset.val=''}
+  const mSel=$('rMonSel'),dSel=$('rDateSel');
+  let curDate=dSel.value||'',curMon=mSel.dataset.val||'';
+  if(curDate&&curMon&&!curDate.startsWith(curMon))curMon=mon[curDate.slice(0,7)]?curDate.slice(0,7):'';
+  if(curMon&&!mon[curMon])curMon='';
+  mSel.dataset.val=curMon;
   mSel.innerHTML='<option value="">All months</option>'+mk.map(k=>`<option value="${k}">${mFmt(k)}</option>`).join('');
   mSel.value=curMon;
   $('rMonSub').textContent=curMon?mFmt(curMon):'All months';
-  $('rSupH').textContent=curMon?'Supplier-wise · '+mFmt(curMon,1):'Supplier-wise';
-  const sup=repSuppliers(curMon);
+  $('rDateSub').textContent=curDate?fmt(curDate):'All dates';
+  $('rDateClr').hidden=!curDate;
+  const fPrefix=curDate||curMon||'';
+  $('rSupH').textContent='Supplier-wise'+(curDate?' · '+fmt(curDate):curMon?' · '+mFmt(curMon,1):'');
+  $('rDateH').textContent='Date-wise'+(curMon?' · '+mFmt(curMon,1):'');
+  const sup=repSuppliers(fPrefix);
   let rBuy=buy,rPaid=paid,rPend=pend;
-  if(curMon){rBuy=0;rPaid=0;rPend=0;Object.values(sup).forEach(g=>{rBuy+=g.a;rPaid+=g.p;rPend+=g.pend})}
+  if(fPrefix){rBuy=0;rPaid=0;rPend=0;Object.values(sup).forEach(g=>{rBuy+=g.a;rPaid+=g.p;rPend+=g.pend})}
   $('rBill').textContent=inr(rBuy);$('rPaid').textContent=inr(rPaid);$('rPend').textContent=inr(rPend);
+  $('rDayBox').hidden=!curDate;
+  if(curDate){
+    const dayB=S.bills.filter(b=>b.date===curDate),dayP=[];
+    S.bills.forEach(b=>payEvents(b).forEach(p=>{if(p.d===curDate)dayP.push({b,p})}));
+    $('rDayH').textContent='Activity · '+fmt(curDate);
+    $('rDayMeta').textContent=dayB.length+' bill'+(dayB.length===1?'':'s')+' · '+dayP.length+' paid';
+    $('rDayList').innerHTML=(dayB.map(b=>{const i=info(b);return `<div class="ditem"><div style="min-width:0"><b>${esc(b.supplier)}</b> <span class="tag ${i.st}">${i.st==='paid'?'Paid':'Bill'}</span><div class="meta">Bill ${esc(b.no||'–')} · ${dueText(i)}${b.img?` · <button type="button" class="pthumb" data-bimg="${b.id}"><svg class="i"><use href="#i-cam"/></svg>Photo</button>`:''}</div></div><div style="text-align:right;white-space:nowrap"><b>${inr(b.amount)}</b>${i.bal>0&&b.paid>0?`<div class="meta">bal ${inr(i.bal)}</div>`:''}</div></div>`}).join('')+
+      dayP.map(({b,p})=>`<div class="ditem"><div style="min-width:0"><b>${esc(b.supplier)}</b> <span class="tag paid">Paid</span><div class="meta">Bill ${esc(b.no||'–')}${p.r?' · RT '+esc(p.r):''}${p.img&&p.idx>=0?` · <button type="button" class="pthumb" data-img="${b.id}|${p.idx}"><svg class="i"><use href="#i-cam"/></svg>Photo</button>`:''}</div></div><div style="text-align:right;white-space:nowrap"><b style="color:var(--green)">+${inr(p.a)}</b></div></div>`).join(''))||`<div class="meta">No bills or payments on ${fmt(curDate)}.</div>`;
+  }else $('rDayList').innerHTML='';
+  const days=repDates(curMon),dk=Object.keys(days).sort().reverse();
+  $('rDates').innerHTML=dk.map(d=>`<tr class="${curDate===d?'sel':''}" data-rdate="${d}"><td style="white-space:nowrap">${fmt(d)}</td><td>${inr(days[d].a)}</td><td>${inr(days[d].p)}</td><td><b>${inr(days[d].pend)}</b></td></tr>`).join('')||'<tr><td colspan="4" class="meta">'+(curMon?'No dates in '+mFmt(curMon)+'.':'No data yet.')+'</td></tr>';
   $('rMonth').innerHTML=mk.map(k=>`<div class="mrow${curMon===k?' sel':''}" data-rmon="${k}"><div class="h"><span>${mFmt(k)}</span></div><div class="mbar"><i class="b-buy" style="width:${mon[k].p/mx*100}%"></i></div><div class="mbar"><i class="b-pay" style="width:${mon[k].y/mx*100}%"></i></div><div class="mleg"><span>Purchases ${inr(mon[k].p)}</span><span>Payments ${inr(mon[k].y)}</span></div></div>`).join('')||empty('chart','No data yet.');
-  $('rSup').innerHTML=Object.keys(sup).sort((a,b)=>sup[b].pend-sup[a].pend||sup[b].a-sup[a].a||a.localeCompare(b)).map(k=>`<tr><td>${esc(k)}</td><td>${inr(sup[k].a)}</td><td>${inr(sup[k].p)}</td><td><b>${inr(sup[k].pend)}</b></td></tr>`).join('')||'<tr><td colspan="4" class="meta">'+(curMon?'No data for '+mFmt(curMon)+'.':'No data yet.')+'</td></tr>';
+  $('rSup').innerHTML=Object.keys(sup).sort((a,b)=>sup[b].pend-sup[a].pend||sup[b].a-sup[a].a||a.localeCompare(b)).map(k=>`<tr><td>${esc(k)}</td><td>${inr(sup[k].a)}</td><td>${inr(sup[k].p)}</td><td><b>${inr(sup[k].pend)}</b></td></tr>`).join('')||'<tr><td colspan="4" class="meta">'+(fPrefix?'No data for '+(curDate?fmt(curDate):mFmt(curMon))+'.':'No data yet.')+'</td></tr>';
   $('sdays').value=S.defDays;
 }
 /* navigation */
@@ -812,48 +845,64 @@ $('sdays').onchange=()=>{S.defDays=Math.max(0,Number($('sdays').value)||0);S.def
 $('q').oninput=render;$('sq').oninput=render;
 $('qClr').onclick=()=>{$('q').value='';render();$('q').focus()};
 $('viewAll').onclick=()=>{showAll=!showAll;render()};
-$('rMonSel').onchange=()=>{const s=$('rMonSel');s.dataset.val=s.value;render()};
-$('rMonth').onclick=e=>{const r=e.target.closest('[data-rmon]');if(!r)return;const s=$('rMonSel');s.dataset.val=(s.dataset.val||'')===r.dataset.rmon?'':r.dataset.rmon;render()};
-function repSuppliers(m){
+$('rMonSel').onchange=()=>{const s=$('rMonSel');s.dataset.val=s.value;$('rDateSel').value='';render()};
+$('rMonth').onclick=e=>{const r=e.target.closest('[data-rmon]');if(!r)return;const s=$('rMonSel');s.dataset.val=(s.dataset.val||'')===r.dataset.rmon?'':r.dataset.rmon;$('rDateSel').value='';render()};
+$('rDateSel').onchange=()=>render();
+$('rDateClr').onclick=()=>{$('rDateSel').value='';render()};
+$('rDates').onclick=e=>{const r=e.target.closest('[data-rdate]');if(!r)return;const d=$('rDateSel');d.value=d.value===r.dataset.rdate?'':r.dataset.rdate;render()};
+function repSuppliers(f){
   const sup={};
   S.bills.forEach(b=>{
     const g=sup[b.supplier]=sup[b.supplier]||{n:0,a:0,p:0,pend:0};
-    if(!m){
+    if(!f){
       g.n++;g.a+=b.amount;const pd=Math.min(b.paid,b.amount);g.p+=pd;g.pend+=Math.max(0,b.amount-pd);
     }else{
-      if((b.date||'').slice(0,7)===m){g.n++;g.a+=b.amount;g.pend+=info(b).bal}
-      payEvents(b).forEach(p=>{if((p.d||'').slice(0,7)===m)g.p+=p.a});
+      if((b.date||'').startsWith(f)){g.n++;g.a+=b.amount;g.pend+=info(b).bal}
+      payEvents(b).forEach(p=>{if((p.d||'').startsWith(f))g.p+=p.a});
     }
   });
-  if(m)Object.keys(sup).forEach(k=>{if(!sup[k].n&&!sup[k].a&&!sup[k].p)delete sup[k]});
+  if(f)Object.keys(sup).forEach(k=>{if(!sup[k].n&&!sup[k].a&&!sup[k].p)delete sup[k]});
   return sup;
+}
+function repDates(f){
+  const days={};
+  S.bills.forEach(b=>{
+    if(b.date&&(!f||b.date.startsWith(f))){const g=days[b.date]=days[b.date]||{n:0,np:0,a:0,p:0,pend:0};g.n++;g.a+=b.amount;g.pend+=info(b).bal}
+    payEvents(b).forEach(p=>{if(p.d&&(!f||p.d.startsWith(f))){const g=days[p.d]=days[p.d]||{n:0,np:0,a:0,p:0,pend:0};g.np++;g.p+=p.a}});
+  });
+  return days;
 }
 function dl(name,text,type){const u=URL.createObjectURL(new Blob([text],{type})),a=document.createElement('a');a.href=u;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(u),1000)}
 const csvCell=v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"';
 const csvRows=rows=>'\ufeff'+rows.map(r=>r.map(csvCell).join(',')).join('\r\n');
-function exportData(kind,monFilter){
-  const m=monFilter||'';
-  const stamp=iso(new Date())+(m?'-'+m:'');
+function exportData(kind,dateFilter){
+  const f=dateFilter||'';
+  const stamp=iso(new Date())+(f?'-'+f:'');
   if(kind==='bills'){
     const rows=[['Supplier','Bill no','Bill date','Credit days','Due date','Amount','Paid','Balance','Status','RT / Receipt numbers','Bill photo','Payment photos','Note']];
-    S.bills.filter(b=>!m||(b.date||'').slice(0,7)===m).forEach(b=>{const i=info(b);const lbl={paid:'Paid',overdue:'Overdue',soon:'Due soon',open:'Pending'}[i.st];rows.push([b.supplier,b.no,b.date,b.days,iso(i.due),b.amount,b.paid||0,i.bal,lbl,b.pays.map(p=>p.r).filter(Boolean).join('; '),b.img?'Yes':'No',b.pays.filter(p=>p.img).length,b.notes])});
+    S.bills.filter(b=>!f||(b.date||'').startsWith(f)).forEach(b=>{const i=info(b);const lbl={paid:'Paid',overdue:'Overdue',soon:'Due soon',open:'Pending'}[i.st];rows.push([b.supplier,b.no,b.date,b.days,iso(i.due),b.amount,b.paid||0,i.bal,lbl,b.pays.map(p=>p.r).filter(Boolean).join('; '),b.img?'Yes':'No',b.pays.filter(p=>p.img).length,b.notes])});
     dl('inhaero-bills-'+stamp+'.csv',csvRows(rows),'text/csv;charset=utf-8');
   }else if(kind==='payments'){
     const rows=[['Payment date','Supplier','Bill no','Bill amount','Amount paid','RT / Receipt no','Photo attached']];
-    const ev=[];S.bills.forEach(b=>payEvents(b).filter(p=>!m||(p.d||'').slice(0,7)===m).forEach(p=>ev.push([p.d,b.supplier,b.no,b.amount,p.a,p.r,p.img?'Yes':'No'])));
+    const ev=[];S.bills.forEach(b=>payEvents(b).filter(p=>!f||(p.d||'').startsWith(f)).forEach(p=>ev.push([p.d,b.supplier,b.no,b.amount,p.a,p.r,p.img?'Yes':'No'])));
     ev.sort((a,c)=>a[0]<c[0]?-1:a[0]>c[0]?1:0).forEach(r=>rows.push(r));
     dl('inhaero-payments-'+stamp+'.csv',csvRows(rows),'text/csv;charset=utf-8');
   }else if(kind==='suppliers'){
     const rows=[['Supplier','Bills','Total billed','Paid','Pending']];
-    const sup=repSuppliers(m);
+    const sup=repSuppliers(f);
     Object.keys(sup).sort((a,b)=>sup[b].pend-sup[a].pend||sup[b].a-sup[a].a||a.localeCompare(b)).forEach(k=>{const g=sup[k];rows.push([k,g.n,g.a,g.p,g.pend])});
     dl('inhaero-suppliers-'+stamp+'.csv',csvRows(rows),'text/csv;charset=utf-8');
+  }else if(kind==='dates'){
+    const rows=[['Date','Bills','Billed','Payments','Paid','Pending']];
+    const days=repDates(f);
+    Object.keys(days).sort().reverse().forEach(d=>{const g=days[d];rows.push([d,g.n,g.a,g.np,g.p,g.pend])});
+    dl('inhaero-datewise-'+stamp+'.csv',csvRows(rows),'text/csv;charset=utf-8');
   }else{
     dl('inhaero-backup-'+iso(new Date())+'.json',JSON.stringify({bills:S.bills,budget:S.budget,defDays:S.defDays}),'application/json');
   }
   toast('Export downloaded');
 }
-document.addEventListener('click',e=>{const x=e.target.closest('[data-exp]');if(x)exportData(x.dataset.exp,x.closest('#v-reports')?$('rMonSel').dataset.val||'':'')});
+document.addEventListener('click',e=>{const x=e.target.closest('[data-exp]');if(x)exportData(x.dataset.exp,x.closest('#v-reports')?($('rDateSel').value||$('rMonSel').dataset.val||''):'')});
 /* PIN-locked reset */
 const PIN_HASH='75dedb59f3148146392cab81dd4e8bd071e99a05764f151e5e7caaebc550db0e';
 function sha256(s){
