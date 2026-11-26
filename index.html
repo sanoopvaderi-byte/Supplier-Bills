@@ -167,9 +167,6 @@ td:not(:first-child),th:not(:first-child){text-align:right;font-variant-numeric:
 /* settings */
 .setrow{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:6px 0}
 .setrow+.setrow{border-top:1px solid var(--line);padding-top:14px;margin-top:8px}
-/* plan summary */
-.split{display:grid;grid-template-columns:1fr auto;gap:14px;align-items:end}
-.sumbox{text-align:right}.sumbox span{display:block;font-size:.8rem;color:var(--mute)}.sumbox b{font-size:1.5rem;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
 /* tabs */
 .tabs{position:fixed;left:50%;transform:translateX(-50%);bottom:0;width:100%;max-width:720px;z-index:30;display:grid;grid-template-columns:repeat(5,1fr);align-items:end;padding:8px 10px calc(8px + env(safe-area-inset-bottom,0px));background:color-mix(in srgb,var(--surface) 90%,transparent);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-top:1px solid var(--line);border-radius:22px 22px 0 0;box-shadow:0 -8px 26px rgba(15,23,42,.07)}
 .tab{display:grid;justify-items:center;gap:2px;min-height:52px;padding:6px 0;font-size:.7rem;font-weight:650;color:var(--mute);border-radius:14px}
@@ -240,7 +237,7 @@ td:not(:first-child),th:not(:first-child){text-align:right;font-variant-numeric:
         <div class="prog"><i id="progBar"></i></div>
         <div class="prog-l"><span id="progL">Paid ₹0 of ₹0</span><span id="progP">0%</span></div>
         <div class="hero-btns">
-          <button class="hbtn primary" type="button" data-go="pay"><svg class="i"><use href="#i-wallet"/></svg>Pay today</button>
+          <button class="hbtn primary" type="button" data-go="pay"><svg class="i"><use href="#i-wallet"/></svg>Pay bill</button>
           <button class="hbtn" type="button" data-go="entry"><svg class="i"><use href="#i-plus"/></svg>New bill</button>
         </div>
       </div>
@@ -313,16 +310,6 @@ td:not(:first-child),th:not(:first-child){text-align:right;font-variant-numeric:
           <div class="full"><button class="btn" id="paySubmit" type="button" style="width:100%"><svg class="i"><use href="#i-check"/></svg>Record payment</button></div>
         </div>
       </div>
-
-      <div class="card">
-        <h2 style="margin-bottom:10px">Daily payment plan</h2>
-        <div class="split">
-          <label>Daily payment budget<span class="money"><input id="budget" type="number" min="0" inputmode="numeric"></span></label>
-          <div class="sumbox"><span>Planned today</span><b id="planTot">₹0</b></div>
-        </div>
-        <p class="hint" style="margin-top:10px">Earliest due bills are listed first until the budget is used.</p>
-      </div>
-      <div id="plan" style="display:grid;gap:12px"></div>
     </section>
 
     <!-- SEARCH -->
@@ -517,7 +504,7 @@ function render(){
   $('actsTitle').textContent=showAll?'All activity':'Today’s activity';
   $('acts').innerHTML=shown.length?shown.map(a=>`<div class="row"><span class="chip-ic ${a.k==='buy'?'c-blue':'c-green'}"><svg class="i"><use href="#i-${a.k==='buy'?'cart':'card'}"/></svg></span><span class="tx"><b>${esc(a.t)}</b><span>${esc(a.sub)}${showAll?' · '+fmtShort(a.d):''}</span>${a.img?` <button type="button" class="pthumb" data-img="${a.bid}|${a.pidx}"><svg class="i"><use href="#i-cam"/></svg>Photo</button>`:''}</span><span class="amt">${inr(a.a)}<small><span class="tag ${a.s==='Paid'?'paid':'pending'}">${a.s}</span></small></span></div>`).join(''):empty('inbox',acts.length?'No bills or payments today yet. Tap View all to see earlier activity.':'No activity yet. Tap New to add your first bill.');
   $('viewAll').textContent=showAll?'Today only':'View all';$('viewAll').hidden=!showAll&&acts.length===todays.length;
-  // pay supplier form + pay plan
+  // pay supplier form
   const open=S.bills.map(b=>({b,i:info(b)})).filter(x=>x.i.bal>0).sort((a,c)=>a.i.due-c.i.due);
   const supMap={};
   open.forEach(x=>{(supMap[x.b.supplier]=supMap[x.b.supplier]||{pend:0,bills:[]}).bills.push(x);supMap[x.b.supplier].pend+=x.i.bal});
@@ -531,12 +518,6 @@ function render(){
     $('paySup').value=openSups.includes(prevSup)?prevSup:openSups[0];
     fillPayBills(supMap);
   }
-  $('budget').value=S.budget;
-  let rest=Number(S.budget)||0,tot=0,html='';
-  for(const x of open){if(rest<=0)break;const a=Math.min(rest,x.i.bal);rest-=a;tot+=a;
-    html+=`<div class="bcard ${x.i.st}"><div class="btop"><div><b>${esc(x.b.supplier)}</b><div class="meta">Bill ${esc(x.b.no||'–')} · ${dueText(x.i)}</div></div><div class="amt">${inr(a)}<small>${a<x.i.bal?'of '+inr(x.i.bal):'full balance'}</small></div></div><input id="pr-${x.b.id}" placeholder="RT / Receipt no. (optional)" style="min-height:44px"><button class="btn ok sm" type="button" data-plan="${x.b.id}|${a}"><svg class="i"><use href="#i-check"/></svg>Mark ${inr(a)} as paid</button></div>`}
-  $('planTot').textContent=inr(tot);
-  $('plan').innerHTML=open.length?html:`<div class="card">${empty('check','No pending bills to pay.')}</div>`;
   // list
   const f=listF,q=$('q').value.trim().toLowerCase();
   const cnt={pending:0,overdue:0,paid:0,all:S.bills.length};S.bills.forEach(b=>{const i=info(b);if(i.bal>0)cnt.pending++;if(i.st==='overdue')cnt.overdue++;if(i.bal<=0)cnt.paid++});
@@ -691,8 +672,6 @@ $('list').onclick=e=>{
     if(recordPay(S.bills.find(x=>x.id===p),v,$('r-'+p).value,listPhotos[p]||''))delete listPhotos[p];}
   if(d&&confirm('Delete this bill?')){delete listPhotos[d];S.bills=S.bills.filter(x=>x.id!==d);save();render();toast('Bill deleted')}
 };
-$('plan').onclick=e=>{const bt=e.target.closest('[data-plan]');if(!bt)return;const[id,a]=bt.dataset.plan.split('|');const b=S.bills.find(x=>x.id===id);if(b&&confirm('Mark '+inr(Number(a))+' as paid to '+b.supplier+'?'))recordPay(b,Number(a),$('pr-'+id).value)};
-$('budget').onchange=()=>{S.budget=Number($('budget').value)||0;save();render()};
 $('sdays').onchange=()=>{S.defDays=Math.max(0,Number($('sdays').value)||0);$('days').value=S.defDays;save();render();dueUpd()};
 $('q').oninput=render;$('sq').oninput=render;
 $('viewAll').onclick=()=>{showAll=!showAll;render()};
