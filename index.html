@@ -162,6 +162,7 @@ input[type=file]::file-selector-button{margin-right:12px;border:0;border-radius:
 .phist{border-top:1px dashed var(--line);padding-top:8px;display:grid;gap:6px;font-size:.84rem;color:var(--mute)}
 .phist .pl{display:flex;justify-content:space-between;align-items:center;gap:8px}.phist b{color:var(--ink)}
 .acts{display:flex;gap:8px}.acts .btn{flex:1}
+.mrow[data-rmon]{cursor:pointer;border-radius:12px;padding:10px 8px;transition:background .15s,box-shadow .15s}.mrow.sel{background:var(--soft);box-shadow:inset 0 0 0 1px var(--line)}
 /* supplier boxes */
 .sbox{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px;box-shadow:var(--shadow)}
 .shead{display:flex;align-items:center;gap:12px;margin-bottom:6px}
@@ -357,13 +358,14 @@ td:not(:first-child),th:not(:first-child){text-align:right;font-variant-numeric:
 
     <!-- REPORTS -->
     <section class="view" id="v-reports" hidden>
+      <div class="card" style="padding:12px 16px"><div class="setrow" style="padding:0"><div style="min-width:0"><div style="font-weight:700;font-size:.95rem">Month</div><div class="meta" id="rMonSub">All months</div></div><select id="rMonSel" aria-label="Choose month" style="width:auto;min-width:150px;max-width:190px;flex-shrink:0"></select></div></div>
       <div class="k3">
         <div class="kpi"><span>Billed</span><b id="rBill">₹0</b></div>
         <div class="kpi"><span>Paid</span><b id="rPaid">₹0</b></div>
         <div class="kpi"><span>Pending</span><b id="rPend">₹0</b></div>
       </div>
       <div class="card"><div class="sec"><h2>Month-wise</h2><span class="meta"><span style="color:#3b82f6">●</span> Purchases &nbsp;<span style="color:#22c55e">●</span> Payments</span></div><div id="rMonth"></div></div>
-      <div class="card"><h2 style="margin-bottom:6px">Supplier-wise</h2><div class="scroll"><table><thead><tr><th>Supplier</th><th>Billed</th><th>Paid</th><th>Pending</th></tr></thead><tbody id="rSup"></tbody></table></div></div>
+      <div class="card"><h2 id="rSupH" style="margin-bottom:6px">Supplier-wise</h2><div class="scroll"><table><thead><tr><th>Supplier</th><th>Billed</th><th>Paid</th><th>Pending</th></tr></thead><tbody id="rSup"></tbody></table></div></div>
       <div class="card">
         <h2 style="margin-bottom:4px">Export details</h2>
         <p class="hint" style="margin:0 0 12px">CSVs open in Excel or Google Sheets. Backup saves everything.</p>
@@ -623,14 +625,21 @@ function render(){
   chips($('schips'),[['pending','Pending only'],['all','All bills']],srchF,'data-sf');
   $('sres').innerHTML=supplierBoxes(srchF==='pending',$('sq').value.trim().toLowerCase());
   // reports
-  $('rBill').textContent=inr(buy);$('rPaid').textContent=inr(paid);$('rPend').textContent=inr(pend);
   const mon={};
-  S.bills.forEach(b=>{(mon[b.date.slice(0,7)]=mon[b.date.slice(0,7)]||{p:0,y:0}).p+=b.amount;payEvents(b).forEach(p=>{(mon[p.d.slice(0,7)]=mon[p.d.slice(0,7)]||{p:0,y:0}).y+=p.a})});
+  S.bills.forEach(b=>{const bm=(b.date||'').slice(0,7);if(bm)(mon[bm]=mon[bm]||{p:0,y:0}).p+=b.amount;payEvents(b).forEach(p=>{const pm=(p.d||'').slice(0,7);if(pm)(mon[pm]=mon[pm]||{p:0,y:0}).y+=p.a})});
   const mk=Object.keys(mon).sort().reverse(),mx=Math.max(1,...mk.map(k=>Math.max(mon[k].p,mon[k].y)));
-  $('rMonth').innerHTML=mk.map(k=>`<div class="mrow"><div class="h"><span>${new Date(k+'-01T00:00:00').toLocaleDateString('en-GB',{month:'long',year:'numeric'})}</span></div><div class="mbar"><i class="b-buy" style="width:${mon[k].p/mx*100}%"></i></div><div class="mbar"><i class="b-pay" style="width:${mon[k].y/mx*100}%"></i></div><div class="mleg"><span>Purchases ${inr(mon[k].p)}</span><span>Payments ${inr(mon[k].y)}</span></div></div>`).join('')||empty('chart','No data yet.');
-  const sup={};
-  S.bills.forEach(b=>{const g=sup[b.supplier]=sup[b.supplier]||{a:0,p:0};g.a+=b.amount;g.p+=Math.min(b.paid,b.amount)});
-  $('rSup').innerHTML=Object.keys(sup).sort((a,b)=>(sup[b].a-sup[b].p)-(sup[a].a-sup[a].p)).map(k=>`<tr><td>${esc(k)}</td><td>${inr(sup[k].a)}</td><td>${inr(sup[k].p)}</td><td><b>${inr(sup[k].a-sup[k].p)}</b></td></tr>`).join('')||'<tr><td colspan="4" class="meta">No data yet.</td></tr>';
+  const mFmt=(k,s)=>new Date(k+'-01T00:00:00').toLocaleDateString('en-GB',{month:s?'short':'long',year:'numeric'});
+  const mSel=$('rMonSel');let curMon=mSel.dataset.val||'';if(curMon&&!mon[curMon]){curMon='';mSel.dataset.val=''}
+  mSel.innerHTML='<option value="">All months</option>'+mk.map(k=>`<option value="${k}">${mFmt(k)}</option>`).join('');
+  mSel.value=curMon;
+  $('rMonSub').textContent=curMon?mFmt(curMon):'All months';
+  $('rSupH').textContent=curMon?'Supplier-wise · '+mFmt(curMon,1):'Supplier-wise';
+  const sup=repSuppliers(curMon);
+  let rBuy=buy,rPaid=paid,rPend=pend;
+  if(curMon){rBuy=0;rPaid=0;rPend=0;Object.values(sup).forEach(g=>{rBuy+=g.a;rPaid+=g.p;rPend+=g.pend})}
+  $('rBill').textContent=inr(rBuy);$('rPaid').textContent=inr(rPaid);$('rPend').textContent=inr(rPend);
+  $('rMonth').innerHTML=mk.map(k=>`<div class="mrow${curMon===k?' sel':''}" data-rmon="${k}"><div class="h"><span>${mFmt(k)}</span></div><div class="mbar"><i class="b-buy" style="width:${mon[k].p/mx*100}%"></i></div><div class="mbar"><i class="b-pay" style="width:${mon[k].y/mx*100}%"></i></div><div class="mleg"><span>Purchases ${inr(mon[k].p)}</span><span>Payments ${inr(mon[k].y)}</span></div></div>`).join('')||empty('chart','No data yet.');
+  $('rSup').innerHTML=Object.keys(sup).sort((a,b)=>sup[b].pend-sup[a].pend||sup[b].a-sup[a].a||a.localeCompare(b)).map(k=>`<tr><td>${esc(k)}</td><td>${inr(sup[k].a)}</td><td>${inr(sup[k].p)}</td><td><b>${inr(sup[k].pend)}</b></td></tr>`).join('')||'<tr><td colspan="4" class="meta">'+(curMon?'No data for '+mFmt(curMon)+'.':'No data yet.')+'</td></tr>';
   $('sdays').value=S.defDays;
 }
 /* navigation */
@@ -803,31 +812,48 @@ $('sdays').onchange=()=>{S.defDays=Math.max(0,Number($('sdays').value)||0);S.def
 $('q').oninput=render;$('sq').oninput=render;
 $('qClr').onclick=()=>{$('q').value='';render();$('q').focus()};
 $('viewAll').onclick=()=>{showAll=!showAll;render()};
+$('rMonSel').onchange=()=>{const s=$('rMonSel');s.dataset.val=s.value;render()};
+$('rMonth').onclick=e=>{const r=e.target.closest('[data-rmon]');if(!r)return;const s=$('rMonSel');s.dataset.val=(s.dataset.val||'')===r.dataset.rmon?'':r.dataset.rmon;render()};
+function repSuppliers(m){
+  const sup={};
+  S.bills.forEach(b=>{
+    const g=sup[b.supplier]=sup[b.supplier]||{n:0,a:0,p:0,pend:0};
+    if(!m){
+      g.n++;g.a+=b.amount;const pd=Math.min(b.paid,b.amount);g.p+=pd;g.pend+=Math.max(0,b.amount-pd);
+    }else{
+      if((b.date||'').slice(0,7)===m){g.n++;g.a+=b.amount;g.pend+=info(b).bal}
+      payEvents(b).forEach(p=>{if((p.d||'').slice(0,7)===m)g.p+=p.a});
+    }
+  });
+  if(m)Object.keys(sup).forEach(k=>{if(!sup[k].n&&!sup[k].a&&!sup[k].p)delete sup[k]});
+  return sup;
+}
 function dl(name,text,type){const u=URL.createObjectURL(new Blob([text],{type})),a=document.createElement('a');a.href=u;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(u),1000)}
 const csvCell=v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"';
 const csvRows=rows=>'\ufeff'+rows.map(r=>r.map(csvCell).join(',')).join('\r\n');
-function exportData(kind){
-  const stamp=iso(new Date());
+function exportData(kind,monFilter){
+  const m=monFilter||'';
+  const stamp=iso(new Date())+(m?'-'+m:'');
   if(kind==='bills'){
     const rows=[['Supplier','Bill no','Bill date','Credit days','Due date','Amount','Paid','Balance','Status','RT / Receipt numbers','Bill photo','Payment photos','Note']];
-    S.bills.forEach(b=>{const i=info(b);const lbl={paid:'Paid',overdue:'Overdue',soon:'Due soon',open:'Pending'}[i.st];rows.push([b.supplier,b.no,b.date,b.days,iso(i.due),b.amount,b.paid||0,i.bal,lbl,b.pays.map(p=>p.r).filter(Boolean).join('; '),b.img?'Yes':'No',b.pays.filter(p=>p.img).length,b.notes])});
+    S.bills.filter(b=>!m||(b.date||'').slice(0,7)===m).forEach(b=>{const i=info(b);const lbl={paid:'Paid',overdue:'Overdue',soon:'Due soon',open:'Pending'}[i.st];rows.push([b.supplier,b.no,b.date,b.days,iso(i.due),b.amount,b.paid||0,i.bal,lbl,b.pays.map(p=>p.r).filter(Boolean).join('; '),b.img?'Yes':'No',b.pays.filter(p=>p.img).length,b.notes])});
     dl('inhaero-bills-'+stamp+'.csv',csvRows(rows),'text/csv;charset=utf-8');
   }else if(kind==='payments'){
     const rows=[['Payment date','Supplier','Bill no','Bill amount','Amount paid','RT / Receipt no','Photo attached']];
-    const ev=[];S.bills.forEach(b=>payEvents(b).forEach(p=>ev.push([p.d,b.supplier,b.no,b.amount,p.a,p.r,p.img?'Yes':'No'])));
+    const ev=[];S.bills.forEach(b=>payEvents(b).filter(p=>!m||(p.d||'').slice(0,7)===m).forEach(p=>ev.push([p.d,b.supplier,b.no,b.amount,p.a,p.r,p.img?'Yes':'No'])));
     ev.sort((a,c)=>a[0]<c[0]?-1:a[0]>c[0]?1:0).forEach(r=>rows.push(r));
     dl('inhaero-payments-'+stamp+'.csv',csvRows(rows),'text/csv;charset=utf-8');
   }else if(kind==='suppliers'){
     const rows=[['Supplier','Bills','Total billed','Paid','Pending']];
-    const sup={};S.bills.forEach(b=>{const g=sup[b.supplier]=sup[b.supplier]||{n:0,a:0,p:0};g.n++;g.a+=b.amount;g.p+=Math.min(b.paid,b.amount)});
-    Object.keys(sup).sort((a,b)=>(sup[b].a-sup[b].p)-(sup[a].a-sup[a].p)||a.localeCompare(b)).forEach(k=>{const g=sup[k];rows.push([k,g.n,g.a,g.p,Math.max(0,g.a-g.p)])});
+    const sup=repSuppliers(m);
+    Object.keys(sup).sort((a,b)=>sup[b].pend-sup[a].pend||sup[b].a-sup[a].a||a.localeCompare(b)).forEach(k=>{const g=sup[k];rows.push([k,g.n,g.a,g.p,g.pend])});
     dl('inhaero-suppliers-'+stamp+'.csv',csvRows(rows),'text/csv;charset=utf-8');
   }else{
-    dl('inhaero-backup-'+stamp+'.json',JSON.stringify({bills:S.bills,budget:S.budget,defDays:S.defDays}),'application/json');
+    dl('inhaero-backup-'+iso(new Date())+'.json',JSON.stringify({bills:S.bills,budget:S.budget,defDays:S.defDays}),'application/json');
   }
   toast('Export downloaded');
 }
-document.addEventListener('click',e=>{const x=e.target.closest('[data-exp]');if(x)exportData(x.dataset.exp)});
+document.addEventListener('click',e=>{const x=e.target.closest('[data-exp]');if(x)exportData(x.dataset.exp,x.closest('#v-reports')?$('rMonSel').dataset.val||'':'')});
 /* PIN-locked reset */
 const PIN_HASH='75dedb59f3148146392cab81dd4e8bd071e99a05764f151e5e7caaebc550db0e';
 function sha256(s){
