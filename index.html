@@ -118,7 +118,10 @@ input:focus,select:focus{outline:0;border-color:var(--brand);box-shadow:0 0 0 4p
 input[type=file]{padding:9px 12px;font-size:.9rem}
 input[type=file]::file-selector-button{margin-right:12px;border:0;border-radius:10px;padding:9px 14px;font:inherit;font-size:.88rem;font-weight:650;background:var(--blue-t);color:var(--blue);cursor:pointer}
 .chips button.on{background:var(--ink);border-color:var(--ink);color:var(--surface)}
-.searchbox{position:relative}.searchbox svg{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--mute)}.searchbox input{padding-left:42px}
+.searchbox{position:relative}.searchbox>svg{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--mute)}.searchbox input{padding:12px 44px}
+.qclr{position:absolute;right:8px;top:50%;transform:translateY(-50%);width:34px;height:34px;border-radius:99px;display:grid;place-items:center;color:var(--mute);background:var(--soft)}
+.cntbox{display:flex;justify-content:space-between;align-items:center;gap:12px;padding-bottom:10px}
+.cntnum{font-size:1.55rem;font-weight:750;letter-spacing:-.02em;font-variant-numeric:tabular-nums;line-height:1.15}
 .hint{font-size:.84rem;color:var(--mute);margin:-4px 0 0}
 /* bill cards */
 .bcard{background:var(--surface);border:1px solid var(--line);border-left:5px solid var(--line);border-radius:16px;padding:14px;box-shadow:var(--shadow);display:grid;gap:10px}
@@ -298,7 +301,7 @@ td:not(:first-child),th:not(:first-child){text-align:right;font-variant-numeric:
 
     <!-- BILLS -->
     <section class="view" id="v-list" hidden>
-      <div class="searchbox"><svg class="i"><use href="#i-search"/></svg><input id="q" placeholder="Search supplier or bill no."></div>
+      <div class="searchbox"><svg class="i"><use href="#i-search"/></svg><input id="q" placeholder="Search supplier or bill no."><button type="button" id="qClr" class="qclr" aria-label="Clear search" hidden><svg class="i"><use href="#i-x"/></svg></button></div>
       <div class="chips" id="fchips"></div>
       <div id="list" style="display:grid;gap:12px"></div>
     </section>
@@ -569,21 +572,36 @@ function render(){
     fillPayBills(supMap);
   }
   // list
-  const f=listF,q=$('q').value.trim().toLowerCase();
+  const f=listF,rawQ=$('q').value,q=rawQ.trim().toLowerCase();
+  $('qClr').hidden=!rawQ;
   const cnt={pending:0,overdue:0,paid:0,all:S.bills.length};S.bills.forEach(b=>{const i=info(b);if(i.bal>0)cnt.pending++;if(i.st==='overdue')cnt.overdue++;if(i.bal<=0)cnt.paid++});
   chips($('fchips'),[['pending','Pending '+cnt.pending],['overdue','Overdue '+cnt.overdue],['paid','Paid '+cnt.paid],['all','All '+cnt.all]],f,'data-f');
   const rows=S.bills.map(b=>({b,i:info(b)})).filter(x=>{
     if(f==='pending'&&x.i.bal<=0)return false;if(f==='overdue'&&x.i.st!=='overdue')return false;if(f==='paid'&&x.i.bal>0)return false;
     return !q||(x.b.supplier+' '+(x.b.no||'')).toLowerCase().includes(q)}).sort((a,c)=>a.i.due-c.i.due);
-  $('list').innerHTML=rows.length?rows.map(({b,i})=>{
-    const pc=Math.min(100,Math.round((b.paid||0)/b.amount*100));
-    return `<div class="bcard ${i.st}"><div class="btop"><div><b>${esc(b.supplier)}</b><div class="meta">Bill ${esc(b.no||'–')} · ${fmt(b.date)}</div></div><span class="tag ${i.st}">${dueText(i)}</span></div>
-    <div class="bar"><i style="width:${pc}%"></i></div>
-    <div class="bnums"><span>Amount <b>${inr(b.amount)}</b></span><span>Paid <b>${inr(b.paid||0)}</b></span><span>Balance <b>${inr(i.bal)}</b></span></div>
-    <div class="meta">Due ${fmt(iso(i.due))}${b.notes?' · '+esc(b.notes):''}${b.img?` <button type="button" class="pthumb" data-bimg="${b.id}"><svg class="i"><use href="#i-cam"/></svg>Bill photo</button>`:''}</div>
-    ${b.pays.length?'<div class="phist">'+b.pays.map((p,idx)=>`<div class="pl"><span>${fmtShort(p.d)}${p.r?' · RT/Rcpt <b>'+esc(p.r)+'</b>':''}${p.img?` <button type="button" class="pthumb" data-img="${b.id}|${idx}"><svg class="i"><use href="#i-cam"/></svg>Photo</button>`:''}</span><span>${inr(p.a)}</span></div>`).join('')+'</div>':''}
-    ${i.bal>0?`<div class="payform"><span class="money"><input type="number" min="0" step="0.01" inputmode="decimal" placeholder="Amount" id="p-${b.id}"></span><input id="r-${b.id}" placeholder="RT / Receipt no."><label class="pbtn sm${listPhotos[b.id]?' has':''}" id="plbl-${b.id}"><input type="file" accept="image/*" data-limg="${b.id}"><svg class="i"><use href="#i-cam"/></svg><span>${listPhotos[b.id]?'Photo ('+kb(listPhotos[b.id])+')':'Photo'}</span></label><button class="btn sm" type="button" data-pay="${b.id}">Record payment</button></div>`:''}
-    <div class="acts"><button class="btn bad sm" type="button" data-del="${b.id}">Delete</button></div></div>`}).join(''):`<div class="card">${empty('inbox','Nothing to show here.')}</div>`;
+  if(!q&&(f==='pending'||f==='all')){
+    if(!rows.length){
+      $('list').innerHTML=`<div class="card">${empty(f==='pending'?'check':'inbox',f==='pending'?'No pending bills right now.':'No bills yet.')}</div>`;
+    }else{
+      const gsup={};let totVal=0;
+      rows.forEach(({b,i})=>{const val=f==='pending'?i.bal:b.amount;totVal+=val;const g=gsup[b.supplier]=gsup[b.supplier]||{n:0,v:0,p:0};g.n++;g.v+=val;g.p+=i.bal});
+      const skeys=Object.keys(gsup).sort((a,b)=>gsup[b].p-gsup[a].p||a.localeCompare(b));
+      const title=f==='pending'?rows.length+' pending bill'+(rows.length===1?'':'s'):rows.length+' total bill'+(rows.length===1?'':'s');
+      const sub=f==='pending'?'Search or tap a supplier to view full bills':cnt.pending+' pending · '+cnt.paid+' paid · tap a supplier to view';
+      $('list').innerHTML=`<div class="card"><div class="cntbox"><div><div class="cntnum">${title}</div><div class="meta">${sub}</div></div><div class="amt">${inr(totVal)}<small>${f==='pending'?'pending':'billed'}</small></div></div>`+
+      skeys.map(k=>{const g=gsup[k];return `<button class="row" type="button" data-qsup="${esc(k)}"><span class="av">${esc(k.trim().charAt(0).toUpperCase()||'?')}</span><span class="tx"><b>${esc(k)}</b><span>${g.n} bill${g.n>1?'s':''}</span></span><span class="amt">${inr(g.v)}<small>${f==='pending'?'pending':(g.p>0?'bal '+inr(g.p):'settled')}</small></span></button>`}).join('')+`</div>`;
+    }
+  }else{
+    $('list').innerHTML=rows.length?rows.map(({b,i})=>{
+      const pc=Math.min(100,Math.round((b.paid||0)/b.amount*100));
+      return `<div class="bcard ${i.st}"><div class="btop"><div><b>${esc(b.supplier)}</b><div class="meta">Bill ${esc(b.no||'–')} · ${fmt(b.date)}</div></div><span class="tag ${i.st}">${dueText(i)}</span></div>
+      <div class="bar"><i style="width:${pc}%"></i></div>
+      <div class="bnums"><span>Amount <b>${inr(b.amount)}</b></span><span>Paid <b>${inr(b.paid||0)}</b></span><span>Balance <b>${inr(i.bal)}</b></span></div>
+      <div class="meta">Due ${fmt(iso(i.due))}${b.notes?' · '+esc(b.notes):''}${b.img?` <button type="button" class="pthumb" data-bimg="${b.id}"><svg class="i"><use href="#i-cam"/></svg>Bill photo</button>`:''}</div>
+      ${b.pays.length?'<div class="phist">'+b.pays.map((p,idx)=>`<div class="pl"><span>${fmtShort(p.d)}${p.r?' · RT/Rcpt <b>'+esc(p.r)+'</b>':''}${p.img?` <button type="button" class="pthumb" data-img="${b.id}|${idx}"><svg class="i"><use href="#i-cam"/></svg>Photo</button>`:''}</span><span>${inr(p.a)}</span></div>`).join('')+'</div>':''}
+      ${i.bal>0?`<div class="payform"><span class="money"><input type="number" min="0" step="0.01" inputmode="decimal" placeholder="Amount" id="p-${b.id}"></span><input id="r-${b.id}" placeholder="RT / Receipt no."><label class="pbtn sm${listPhotos[b.id]?' has':''}" id="plbl-${b.id}"><input type="file" accept="image/*" data-limg="${b.id}"><svg class="i"><use href="#i-cam"/></svg><span>${listPhotos[b.id]?'Photo ('+kb(listPhotos[b.id])+')':'Photo'}</span></label><button class="btn sm" type="button" data-pay="${b.id}">Record payment</button></div>`:''}
+      <div class="acts"><button class="btn bad sm" type="button" data-del="${b.id}">Delete</button></div></div>`}).join(''):`<div class="card">${empty('inbox','Nothing to show here.')}</div>`;
+  }
   // search
   chips($('schips'),[['pending','Pending only'],['all','All bills']],srchF,'data-sf');
   $('sres').innerHTML=supplierBoxes(srchF==='pending',$('sq').value.trim().toLowerCase());
@@ -732,6 +750,8 @@ $('list').addEventListener('change',async e=>{
   e.target.value='';
 });
 $('list').onclick=e=>{
+  const qs=e.target.closest('[data-qsup]');
+  if(qs){$('q').value=qs.dataset.qsup;render();return}
   const bt=e.target.closest('button');if(!bt)return;
   const p=bt.dataset.pay,d=bt.dataset.del;
   if(p){const v=parseFloat($('p-'+p).value);if(!(v>0)){toast('Enter the amount paid');return}
@@ -740,6 +760,7 @@ $('list').onclick=e=>{
 };
 $('sdays').onchange=()=>{S.defDays=Math.max(0,Number($('sdays').value)||0);S.defDaysAt=Date.now();$('days').value=S.defDays;save();render();dueUpd();window.fbPushSettings?.()};
 $('q').oninput=render;$('sq').oninput=render;
+$('qClr').onclick=()=>{$('q').value='';render();$('q').focus()};
 $('viewAll').onclick=()=>{showAll=!showAll;render()};
 function dl(name,text,type){const u=URL.createObjectURL(new Blob([text],{type})),a=document.createElement('a');a.href=u;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(u),1000)}
 const csvCell=v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"';
@@ -819,7 +840,7 @@ $('doReset').onclick=()=>{
   S={bills:[],budget:1000,defDays:90,defDaysAt:Date.now(),seeded:true,dirty:{},dels:{}};
   prevIds.forEach(id=>{S.dels[id]=true});save();
   showAll=false;listF='pending';srchF='pending';pinTries=0;pinLockUntil=0;listPhotos={};
-  clearEntryPhoto();clearPayPhoto();$('payAmt').value='';$('payRt').value='';
+  clearEntryPhoto();clearPayPhoto();$('payAmt').value='';$('payRt').value='';$('q').value='';$('sq').value='';
   $('days').value=S.defDays;$('date').value=iso(new Date());['supplier','no','amount','notes'].forEach(k=>$(k).value='');$('rst').value='';
   modal(0);render();dueUpd();toast('All data cleared');
   window.fbResetAll?.(prevIds);
