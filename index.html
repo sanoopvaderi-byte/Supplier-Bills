@@ -650,15 +650,18 @@ function render(){
   // reports
   const mon={};
   S.bills.forEach(b=>{const bm=(b.date||'').slice(0,7);if(bm)(mon[bm]=mon[bm]||{p:0,y:0}).p+=b.amount;payEvents(b).forEach(p=>{const pm=(p.d||'').slice(0,7);if(pm)(mon[pm]=mon[pm]||{p:0,y:0}).y+=p.a})});
-  const mk=Object.keys(mon).sort().reverse(),mx=Math.max(1,...mk.map(k=>Math.max(mon[k].p,mon[k].y)));
+  const mSet=new Set(Object.keys(mon)),now=new Date(),cy=now.getFullYear(),cm=now.getMonth();
+  for(let i=0;i<24;i++){const dt=new Date(cy,cm-i,1);mSet.add(dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0'))}
   const mFmt=(k,s)=>new Date(k+'-01T00:00:00').toLocaleDateString('en-GB',{month:s?'short':'long',year:'numeric'});
   const mSel=$('rMonSel'),dSel=$('rDateSel'),dTog=$('rDateTog'),dOn=dTog.dataset.on==='1';
   if(!dOn)dSel.value='';
   let curDate=dOn?(dSel.value||''):'',curMon=mSel.dataset.val||'';
-  if(curDate&&curMon&&!curDate.startsWith(curMon))curMon=mon[curDate.slice(0,7)]?curDate.slice(0,7):'';
-  if(curMon&&!mon[curMon])curMon='';
+  if(curDate){const dm=curDate.slice(0,7);if(curMon&&!curDate.startsWith(curMon)){mSet.add(dm);curMon=dm}}
+  if(curMon&&!mSet.has(curMon))mSet.add(curMon);
+  const mAll=[...mSet].sort().reverse(),mkSet=new Set(Object.keys(mon));if(curMon)mkSet.add(curMon);
+  const mk=[...mkSet].sort().reverse(),mx=Math.max(1,...mk.map(k=>mon[k]?Math.max(mon[k].p,mon[k].y):0));
   mSel.dataset.val=curMon;
-  mSel.innerHTML='<option value="">All months</option>'+mk.map(k=>`<option value="${k}">${mFmt(k)}</option>`).join('');
+  mSel.innerHTML='<option value="">All months</option>'+mAll.map(k=>`<option value="${k}">${mFmt(k)}</option>`).join('');
   mSel.value=curMon;
   $('rMonSub').textContent=curMon?mFmt(curMon):'All months';
   dTog.classList.toggle('on',dOn);dTog.setAttribute('aria-checked',dOn?'true':'false');
@@ -687,7 +690,7 @@ function render(){
     const days=repDates(curMon),dk=Object.keys(days).sort().reverse();
     $('rDates').innerHTML=dk.map(d=>{const g=days[d],sub=[g.n?g.n+(g.n===1?' bill':' bills'):'',g.np?g.np+' paid':''].filter(Boolean).join(' · ');return `<tr class="${curDate===d?'sel':''}" data-rdate="${d}"><td style="white-space:nowrap">${fmt(d)}${sub?`<div class="meta" style="font-size:.73rem">${sub}</div>`:''}</td><td>${inr(g.a)}</td><td>${inr(g.p)}</td><td><b>${inr(g.pend)}</b></td></tr>`}).join('')||'<tr><td colspan="4" class="meta">'+(curMon?'No dates in '+mFmt(curMon)+'.':'No data yet.')+'</td></tr>';
   }else $('rDates').innerHTML='';
-  $('rMonth').innerHTML=mk.map(k=>`<div class="mrow${curMon===k?' sel':''}" data-rmon="${k}"><div class="h"><span>${mFmt(k)}</span></div><div class="mbar"><i class="b-buy" style="width:${mon[k].p/mx*100}%"></i></div><div class="mbar"><i class="b-pay" style="width:${mon[k].y/mx*100}%"></i></div><div class="mleg"><span>Purchases ${inr(mon[k].p)}</span><span>Payments ${inr(mon[k].y)}</span></div></div>`).join('')||empty('chart','No data yet.');
+  $('rMonth').innerHTML=mk.map(k=>{const v=mon[k]||{p:0,y:0};return `<div class="mrow${curMon===k?' sel':''}" data-rmon="${k}"><div class="h"><span>${mFmt(k)}</span></div><div class="mbar"><i class="b-buy" style="width:${v.p/mx*100}%"></i></div><div class="mbar"><i class="b-pay" style="width:${v.y/mx*100}%"></i></div><div class="mleg"><span>Purchases ${inr(v.p)}</span><span>Payments ${inr(v.y)}</span></div></div>`}).join('')||empty('chart','No data yet.');
   $('rSup').innerHTML=Object.keys(sup).sort((a,b)=>sup[b].pend-sup[a].pend||sup[b].a-sup[a].a||a.localeCompare(b)).map(k=>`<tr><td>${esc(k)}</td><td>${inr(sup[k].a)}</td><td>${inr(sup[k].p)}</td><td><b>${inr(sup[k].pend)}</b></td></tr>`).join('')||'<tr><td colspan="4" class="meta">'+(fPrefix?'No data for '+(curDate?fmt(curDate):mFmt(curMon))+'.':'No data yet.')+'</td></tr>';
   $('sdays').value=S.defDays;
 }
