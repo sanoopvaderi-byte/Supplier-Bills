@@ -120,6 +120,13 @@ input[type=file]::file-selector-button{margin-right:12px;border:0;border-radius:
 .chips button.on{background:var(--ink);border-color:var(--ink);color:var(--surface)}
 .searchbox{position:relative}.searchbox>svg{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--mute)}.searchbox input{padding:12px 44px}
 .qclr{position:absolute;right:8px;top:50%;transform:translateY(-50%);width:34px;height:34px;border-radius:99px;display:grid;place-items:center;color:var(--mute);background:var(--soft)}
+.acwrap{position:relative}
+.aclist{position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:25;max-height:240px;overflow-y:auto;background:var(--surface);border:1.5px solid var(--brand);border-radius:14px;box-shadow:0 12px 30px rgba(15,23,42,.18);padding:4px}
+.acitem{display:flex;align-items:center;gap:10px;width:100%;padding:9px 10px;border-radius:10px;text-align:left;min-height:46px}
+.acitem:active,.acitem:hover{background:var(--soft)}
+.acitem .av{width:32px;height:32px;border-radius:9px;font-size:.82rem}
+.acitem .tx{flex:1;min-width:0}.acitem .tx b{display:block;font-size:.92rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.acitem .tx span{font-size:.76rem;color:var(--mute)}
 .cntbox{display:flex;justify-content:space-between;align-items:center;gap:12px;padding-bottom:10px}
 .cntnum{font-size:1.55rem;font-weight:750;letter-spacing:-.02em;font-variant-numeric:tabular-nums;line-height:1.15}
 .hint{font-size:.84rem;color:var(--mute);margin:-4px 0 0}
@@ -274,8 +281,10 @@ td:not(:first-child),th:not(:first-child){text-align:right;font-variant-numeric:
     <section class="view" id="v-entry" hidden>
       <div class="card">
         <div class="grid">
-          <label class="full">Supplier<input id="supplier" list="sups" autocomplete="off" placeholder="e.g. ABC Traders" required></label>
-          <datalist id="sups"></datalist>
+          <div class="full acwrap" id="supWrap">
+            <label>Supplier<input id="supplier" autocomplete="off" placeholder="e.g. ABC Traders" required></label>
+            <div class="aclist" id="supDrop" hidden></div>
+          </div>
           <label>Bill number<input id="no" placeholder="Optional"></label>
           <label>Bill amount<span class="money"><input id="amount" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0"></span></label>
           <label>Bill date<input id="date" type="date"></label>
@@ -622,7 +631,6 @@ function render(){
   const sup={};
   S.bills.forEach(b=>{const g=sup[b.supplier]=sup[b.supplier]||{a:0,p:0};g.a+=b.amount;g.p+=Math.min(b.paid,b.amount)});
   $('rSup').innerHTML=Object.keys(sup).sort((a,b)=>(sup[b].a-sup[b].p)-(sup[a].a-sup[a].p)).map(k=>`<tr><td>${esc(k)}</td><td>${inr(sup[k].a)}</td><td>${inr(sup[k].p)}</td><td><b>${inr(sup[k].a-sup[k].p)}</b></td></tr>`).join('')||'<tr><td colspan="4" class="meta">No data yet.</td></tr>';
-  $('sups').innerHTML=[...new Set(S.bills.map(b=>b.supplier))].map(s=>`<option value="${esc(s)}">`).join('');
   $('sdays').value=S.defDays;
 }
 /* navigation */
@@ -630,6 +638,7 @@ const TITLES={entry:'New purchase entry',list:'Purchase list',pay:'Payment bill'
 function route(){
   if(!$('modal').hidden)modal(0);
   if(!$('imgModal').hidden)closeImg();
+  hideSupDrop();
   const v=location.hash.slice(1);const name=TITLES[v]?v:'home';
   document.querySelectorAll('.view').forEach(s=>{s.hidden=s.id!=='v-'+name});
   $('pagehead').hidden=name==='home';$('vtitle').textContent=TITLES[name]||'';
@@ -675,6 +684,30 @@ $('entryCam').onchange=e=>pickPhoto(e,'entry');
 $('entryPhoto').onchange=e=>pickPhoto(e,'entry');
 $('entryClrImg').onclick=clearEntryPhoto;
 $('entryThumb').onclick=()=>{if(entryPhotoData)openImg(entryPhotoData,$('supplier').value.trim()||'Bill photo','Compressed preview · '+kb(entryPhotoData),'inhaero-bill-preview.jpg')};
+let skipDrop=false;
+function showSupDrop(onlyMatch){
+  if(skipDrop)return;
+  const v=$('supplier').value.trim().toLowerCase(),map={};
+  S.bills.forEach(b=>{const name=(b.supplier||'').trim();if(!name)return;const g=map[name]=map[name]||{n:0,pend:0};g.n++;g.pend+=info(b).bal});
+  const list=Object.keys(map).filter(k=>!v||k.toLowerCase().includes(v)).sort((a,b)=>{
+    const al=a.toLowerCase(),bl=b.toLowerCase(),as=v&&al.startsWith(v)?0:1,bs=v&&bl.startsWith(v)?0:1;
+    return as-bs||map[b].n-map[a].n||a.localeCompare(b);
+  });
+  if(!list.length||(onlyMatch&&list.length===1&&list[0].toLowerCase()===v)){$('supDrop').hidden=true;return}
+  $('supDrop').innerHTML=list.slice(0,20).map(k=>{const g=map[k];
+    return `<button type="button" class="acitem" data-acsup="${esc(k)}"><span class="av">${esc(k.charAt(0).toUpperCase())}</span><span class="tx"><b>${esc(k)}</b><span>${g.n} bill${g.n>1?'s':''}${g.pend>0?' · '+inr(g.pend)+' pending':' · settled'}</span></span></button>`}).join('');
+  $('supDrop').hidden=false;
+}
+function hideSupDrop(){$('supDrop').hidden=true}
+$('supplier').addEventListener('focus',()=>showSupDrop(false));
+$('supplier').addEventListener('input',()=>showSupDrop(true));
+$('supplier').addEventListener('keydown',e=>{if(e.key==='Escape')hideSupDrop()});
+$('supDrop').addEventListener('mousedown',e=>{if(e.target.closest('[data-acsup]'))e.preventDefault()});
+$('supDrop').addEventListener('click',e=>{
+  const b=e.target.closest('[data-acsup]');if(!b)return;
+  $('supplier').value=b.dataset.acsup;hideSupDrop();$('no').focus({preventScroll:true});
+});
+document.addEventListener('click',e=>{if(!e.target.closest('#supWrap'))hideSupDrop()});
 $('add').onclick=()=>{
   const supplier=$('supplier').value.trim(),amount=parseFloat($('amount').value),date=$('date').value;
   if(!supplier||!(amount>0)||!date){toast('Enter supplier, amount and bill date');return}
@@ -682,7 +715,7 @@ $('add').onclick=()=>{
   if(entryPhotoData)item.img=entryPhotoData;
   S.bills.push(item);S.dirty[item.id]=true;delete S.dels[item.id];
   if(!save()){S.bills.pop();delete S.dirty[item.id];toast('Storage full — backup or remove old photos');return}
-  ['supplier','no','amount','notes'].forEach(k=>$(k).value='');clearEntryPhoto();toast('Bill saved · add the next one');render();$('supplier').focus({preventScroll:true});
+  ['supplier','no','amount','notes'].forEach(k=>$(k).value='');clearEntryPhoto();hideSupDrop();toast('Bill saved · add the next one');render();skipDrop=true;$('supplier').focus({preventScroll:true});skipDrop=false;
   window.fbPushBill?.(item);
 };
 function recordPay(b,v,r,img){
