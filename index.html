@@ -130,6 +130,7 @@ input[type=file]::file-selector-button{margin-right:12px;border:0;border-radius:
 .pbtn.sm{min-height:40px;padding:8px 10px;font-size:.84rem;border-radius:11px}
 .pbtn.has{border-style:solid;border-color:var(--brand);color:var(--brand);background:color-mix(in srgb,var(--brand) 8%,transparent)}
 .pbtn input{position:absolute;opacity:0;width:1px;height:1px;pointer-events:none}
+.pgrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px}.pgrid>*{min-width:0}
 .pprev{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:12px;border:1px solid var(--line);background:var(--soft)}
 .pprev img{width:46px;height:46px;border-radius:9px;object-fit:cover;border:1px solid var(--line);cursor:pointer;flex:none;background:#fff}
 .pprev .tx{flex:1;min-width:0;line-height:1.25}.pprev .tx b{display:block;font-size:.88rem}
@@ -207,6 +208,7 @@ td:not(:first-child),th:not(:first-child){text-align:right;font-variant-numeric:
 <symbol id="i-down" viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M4 21h16"/></symbol>
 <symbol id="i-lock" viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></symbol>
 <symbol id="i-cam" viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></symbol>
+<symbol id="i-img" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9.5" r="1.5"/><path d="m21 16-5-5L5 20"/></symbol>
 <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
 <symbol id="i-up" viewBox="0 0 24 24"><path d="M12 15V3M7 8l5-5 5 5M4 21h16"/></symbol>
 </defs>
@@ -270,6 +272,18 @@ td:not(:first-child),th:not(:first-child){text-align:right;font-variant-numeric:
           <label>Credit days<input id="days" type="number" min="0" inputmode="numeric" value="90"></label>
           <div class="full"><div class="chips wrap" id="dchips"><button type="button" data-d="30">30 days</button><button type="button" data-d="45">45 days</button><button type="button" data-d="60">60 days</button><button type="button" data-d="90">90 days</button></div><p class="hint" id="duePrev"></p></div>
           <label class="full">Note<input id="notes" placeholder="Products or anything to identify the bill"></label>
+          <div class="full">
+            <span class="lbl">Bill photo (auto-compressed)</span>
+            <div class="pgrid" id="entryPick">
+              <label class="pbtn"><input id="entryCam" type="file" accept="image/*" capture="environment"><svg class="i"><use href="#i-cam"/></svg><span>Camera</span></label>
+              <label class="pbtn"><input id="entryPhoto" type="file" accept="image/*"><svg class="i"><use href="#i-img"/></svg><span>Gallery</span></label>
+            </div>
+            <div class="pprev" id="entryPrev" hidden>
+              <img id="entryThumb" alt="Bill photo preview">
+              <div class="tx"><b>Bill photo ready</b><span class="meta" id="entrySize"></span></div>
+              <button class="btn bad sm" id="entryClrImg" type="button" aria-label="Remove bill photo"><svg class="i"><use href="#i-x"/></svg></button>
+            </div>
+          </div>
           <div class="full"><button id="add" class="btn" type="button" style="width:100%"><svg class="i"><use href="#i-check"/></svg>Save bill</button></div>
         </div>
       </div>
@@ -299,8 +313,11 @@ td:not(:first-child),th:not(:first-child){text-align:right;font-variant-numeric:
           <label>Bill no.<select id="payBill"></select></label>
           <label class="full">RT / Receipt number<input id="payRt" placeholder="Optional · RT or receipt no."></label>
           <div class="full">
-            <span class="lbl">Payment / Receipt photo</span>
-            <label class="pbtn" id="payPick"><input id="payPhoto" type="file" accept="image/*"><svg class="i"><use href="#i-cam"/></svg><span>Add photo (auto-compressed)</span></label>
+            <span class="lbl">Payment / Receipt photo (auto-compressed)</span>
+            <div class="pgrid" id="payPick">
+              <label class="pbtn"><input id="payCam" type="file" accept="image/*" capture="environment"><svg class="i"><use href="#i-cam"/></svg><span>Camera</span></label>
+              <label class="pbtn"><input id="payPhoto" type="file" accept="image/*"><svg class="i"><use href="#i-img"/></svg><span>Gallery</span></label>
+            </div>
             <div class="pprev" id="payPrev" hidden>
               <img id="payThumb" alt="Receipt preview">
               <div class="tx"><b>Photo ready</b><span class="meta" id="paySize"></span></div>
@@ -439,7 +456,7 @@ function payEvents(b){
   return ev;
 }
 function toast(m){const t=$('toast');t.textContent=m;t.classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>t.classList.remove('show'),2200)}
-let showAll=false,listF='pending',srchF='pending',payPhotoData='',listPhotos={};
+let showAll=false,listF='pending',srchF='pending',payPhotoData='',entryPhotoData='',listPhotos={};
 const kb=d=>Math.max(1,Math.round(d.length*0.75/1024))+' KB';
 function compressPhoto(file){
   return new Promise((res,rej)=>{
@@ -473,7 +490,7 @@ function supplierBoxes(onlyPend,q){
   if(!keys.length)return `<div class="card">${empty('inbox','No matching bills')}</div>`;
   return keys.map(k=>{const g=groups[k];
     return `<div class="sbox"><div class="shead"><div class="av">${esc(k.trim().charAt(0).toUpperCase()||'?')}</div><div class="tx"><b>${esc(k)}</b><span class="meta">${g.bills.length} bill${g.bills.length>1?'s':''} · billed ${inr(g.amt)}</span></div><div class="amt">${inr(g.pend)}<small>pending</small></div></div>`+
-    g.bills.sort((x,y)=>x.i.due-y.i.due).map(({b,i})=>`<div class="sline"><span class="no">Bill ${esc(b.no||'–')} <span class="meta">· ${fmt(b.date)}</span></span><span class="amt">${inr(b.amount)}${i.bal<=0?' <span class="tag paid">Paid</span>':(b.paid>0?'<small>bal '+inr(i.bal)+'</small>':'')}</span></div>`).join('')+`</div>`}).join('');
+    g.bills.sort((x,y)=>x.i.due-y.i.due).map(({b,i})=>`<div class="sline"><span class="no">Bill ${esc(b.no||'–')} <span class="meta">· ${fmt(b.date)}</span>${b.img?` <button type="button" class="pthumb" data-bimg="${b.id}"><svg class="i"><use href="#i-cam"/></svg>Photo</button>`:''}</span><span class="amt">${inr(b.amount)}${i.bal<=0?' <span class="tag paid">Paid</span>':(b.paid>0?'<small>bal '+inr(i.bal)+'</small>':'')}</span></div>`).join('')+`</div>`}).join('');
 }
 function chips(el,items,cur,attr){el.innerHTML=items.map(([k,l])=>`<button type="button" ${attr}="${k}" class="${k===cur?'on':''}">${l}</button>`).join('')}
 function render(){
@@ -483,7 +500,7 @@ function render(){
   S.bills.forEach((b,n)=>{
     const i=info(b);buy+=b.amount;if(b.date.slice(0,7)===ym)buyM+=b.amount;
     if(i.bal>0){pend+=i.bal;due++;if(i.st==='overdue'){over+=i.bal;nOver++}if(i.st==='overdue'||i.st==='soon')attn.push({b,i})}
-    acts.push({d:b.created||b.date,seq:n*2,k:'buy',t:b.supplier,sub:'Purchase'+(b.no?' · Bill '+b.no:''),a:b.amount,s:i.bal<=0?'Paid':'Pending'});
+    acts.push({d:b.created||b.date,seq:n*2,k:'buy',t:b.supplier,sub:'Purchase'+(b.no?' · Bill '+b.no:''),a:b.amount,s:i.bal<=0?'Paid':'Pending',bid:b.id,img:b.img||''});
     payEvents(b).forEach((p,k)=>{paid+=p.a;if(p.d.slice(0,7)===ym)paidM+=p.a;acts.push({d:p.d,seq:n*2+1+k/100,k:'pay',t:b.supplier,sub:'Payment'+(b.no?' · Bill '+b.no:'')+(p.r?' · RT/Rcpt '+p.r:''),a:p.a,s:'Paid',bid:b.id,pidx:p.idx,img:p.img})});
   });
   const h=new Date().getHours();
@@ -502,7 +519,7 @@ function render(){
   const todays=acts.filter(a=>a.d===todayS);
   const shown=showAll?acts.slice(0,100):todays;
   $('actsTitle').textContent=showAll?'All activity':'Today’s activity';
-  $('acts').innerHTML=shown.length?shown.map(a=>`<div class="row"><span class="chip-ic ${a.k==='buy'?'c-blue':'c-green'}"><svg class="i"><use href="#i-${a.k==='buy'?'cart':'card'}"/></svg></span><span class="tx"><b>${esc(a.t)}</b><span>${esc(a.sub)}${showAll?' · '+fmtShort(a.d):''}</span>${a.img?` <button type="button" class="pthumb" data-img="${a.bid}|${a.pidx}"><svg class="i"><use href="#i-cam"/></svg>Photo</button>`:''}</span><span class="amt">${inr(a.a)}<small><span class="tag ${a.s==='Paid'?'paid':'pending'}">${a.s}</span></small></span></div>`).join(''):empty('inbox',acts.length?'No bills or payments today yet. Tap View all to see earlier activity.':'No activity yet. Tap New to add your first bill.');
+  $('acts').innerHTML=shown.length?shown.map(a=>`<div class="row"><span class="chip-ic ${a.k==='buy'?'c-blue':'c-green'}"><svg class="i"><use href="#i-${a.k==='buy'?'cart':'card'}"/></svg></span><span class="tx"><b>${esc(a.t)}</b><span>${esc(a.sub)}${showAll?' · '+fmtShort(a.d):''}</span>${a.img?` <button type="button" class="pthumb" ${a.k==='buy'?`data-bimg="${a.bid}"`:`data-img="${a.bid}|${a.pidx}"`}><svg class="i"><use href="#i-cam"/></svg>${a.k==='buy'?'Bill photo':'Photo'}</button>`:''}</span><span class="amt">${inr(a.a)}<small><span class="tag ${a.s==='Paid'?'paid':'pending'}">${a.s}</span></small></span></div>`).join(''):empty('inbox',acts.length?'No bills or payments today yet. Tap View all to see earlier activity.':'No activity yet. Tap New to add your first bill.');
   $('viewAll').textContent=showAll?'Today only':'View all';$('viewAll').hidden=!showAll&&acts.length===todays.length;
   // pay supplier form
   const open=S.bills.map(b=>({b,i:info(b)})).filter(x=>x.i.bal>0).sort((a,c)=>a.i.due-c.i.due);
@@ -530,9 +547,9 @@ function render(){
     return `<div class="bcard ${i.st}"><div class="btop"><div><b>${esc(b.supplier)}</b><div class="meta">Bill ${esc(b.no||'–')} · ${fmt(b.date)}</div></div><span class="tag ${i.st}">${dueText(i)}</span></div>
     <div class="bar"><i style="width:${pc}%"></i></div>
     <div class="bnums"><span>Amount <b>${inr(b.amount)}</b></span><span>Paid <b>${inr(b.paid||0)}</b></span><span>Balance <b>${inr(i.bal)}</b></span></div>
-    <div class="meta">Due ${fmt(iso(i.due))}${b.notes?' · '+esc(b.notes):''}</div>
+    <div class="meta">Due ${fmt(iso(i.due))}${b.notes?' · '+esc(b.notes):''}${b.img?` <button type="button" class="pthumb" data-bimg="${b.id}"><svg class="i"><use href="#i-cam"/></svg>Bill photo</button>`:''}</div>
     ${b.pays.length?'<div class="phist">'+b.pays.map((p,idx)=>`<div class="pl"><span>${fmtShort(p.d)}${p.r?' · RT/Rcpt <b>'+esc(p.r)+'</b>':''}${p.img?` <button type="button" class="pthumb" data-img="${b.id}|${idx}"><svg class="i"><use href="#i-cam"/></svg>Photo</button>`:''}</span><span>${inr(p.a)}</span></div>`).join('')+'</div>':''}
-    ${i.bal>0?`<div class="payform"><span class="money"><input type="number" min="0" step="0.01" inputmode="decimal" placeholder="Amount paid" id="p-${b.id}"></span><input id="r-${b.id}" placeholder="RT / Receipt no."><label class="pbtn sm${listPhotos[b.id]?' has':''}" id="plbl-${b.id}"><input type="file" accept="image/*" data-limg="${b.id}"><svg class="i"><use href="#i-cam"/></svg><span>${listPhotos[b.id]?'Photo ('+kb(listPhotos[b.id])+')':'Photo'}</span></label><button class="btn sm" type="button" data-pay="${b.id}">Record payment</button></div>`:''}
+    ${i.bal>0?`<div class="payform"><span class="money"><input type="number" min="0" step="0.01" inputmode="decimal" placeholder="Amount" id="p-${b.id}"></span><input id="r-${b.id}" placeholder="RT / Receipt no."><label class="pbtn sm${listPhotos[b.id]?' has':''}" id="plbl-${b.id}"><input type="file" accept="image/*" data-limg="${b.id}"><svg class="i"><use href="#i-cam"/></svg><span>${listPhotos[b.id]?'Photo ('+kb(listPhotos[b.id])+')':'Photo'}</span></label><button class="btn sm" type="button" data-pay="${b.id}">Record payment</button></div>`:''}
     <div class="acts"><button class="btn bad sm" type="button" data-del="${b.id}">Delete</button></div></div>`}).join(''):`<div class="card">${empty('inbox','Nothing to show here.')}</div>`;
   // search
   chips($('schips'),[['pending','Pending only'],['all','All bills']],srchF,'data-sf');
@@ -563,6 +580,10 @@ function route(){
 }
 window.addEventListener('hashchange',route);
 document.addEventListener('click',e=>{
+  const bim=e.target.closest('[data-bimg]');
+  if(bim){const b=S.bills.find(x=>x.id===bim.dataset.bimg);
+    if(b&&b.img)openImg(b.img,b.supplier+(b.no?' · Bill '+b.no:''),fmt(b.date)+' · '+inr(b.amount)+(b.notes?' · '+b.notes:''),'inhaero-bill-'+(b.no||b.date)+'.jpg');
+    return}
   const im=e.target.closest('[data-img]');
   if(im){const[bid,idx]=im.dataset.img.split('|'),b=S.bills.find(x=>x.id===bid),p=b&&b.pays[Number(idx)];
     if(p&&p.img)openImg(p.img,b.supplier+(b.no?' · Bill '+b.no:''),fmt(p.d)+' · '+inr(p.a)+(p.r?' · RT/Rcpt '+p.r:''),'inhaero-receipt-'+(p.r||b.no||p.d)+'.jpg');
@@ -580,11 +601,29 @@ function dueUpd(){
   const x=new Date(d+'T00:00:00');x.setDate(x.getDate()+n);$('duePrev').textContent='Payment due on '+x.toLocaleDateString('en-GB',{weekday:'short',day:'2-digit',month:'short',year:'numeric'});
 }
 $('date').value=iso(new Date());$('days').value=S.defDays;$('date').oninput=dueUpd;$('days').oninput=dueUpd;dueUpd();
+function clearEntryPhoto(){entryPhotoData='';$('entryCam').value='';$('entryPhoto').value='';$('entryPrev').hidden=true;$('entryPick').hidden=false;$('entryThumb').src=''}
+async function pickPhoto(e,kind){
+  const f=e.target.files[0];if(!f)return;
+  try{
+    const d=await compressPhoto(f),pre=kind==='entry'?'entry':'pay';
+    if(kind==='entry')entryPhotoData=d;else payPhotoData=d;
+    $(pre+'Thumb').src=d;$(pre+'Size').textContent='Compressed · '+kb(d)+' (tap to view)';
+    $(pre+'Pick').hidden=true;$(pre+'Prev').hidden=false;
+  }catch(x){toast('Could not read that photo')}
+  e.target.value='';
+}
+$('entryCam').onchange=e=>pickPhoto(e,'entry');
+$('entryPhoto').onchange=e=>pickPhoto(e,'entry');
+$('entryClrImg').onclick=clearEntryPhoto;
+$('entryThumb').onclick=()=>{if(entryPhotoData)openImg(entryPhotoData,$('supplier').value.trim()||'Bill photo','Compressed preview · '+kb(entryPhotoData),'inhaero-bill-preview.jpg')};
 $('add').onclick=()=>{
   const supplier=$('supplier').value.trim(),amount=parseFloat($('amount').value),date=$('date').value;
   if(!supplier||!(amount>0)||!date){toast('Enter supplier, amount and bill date');return}
-  S.bills.push({id:Date.now().toString(36)+Math.random().toString(36).slice(2,5),supplier,no:$('no').value.trim(),amount,date,days:Number($('days').value)||0,notes:$('notes').value.trim(),paid:0,pays:[],created:iso(new Date())});
-  save();['supplier','no','amount','notes'].forEach(k=>$(k).value='');toast('Bill saved · add the next one');render();$('supplier').focus({preventScroll:true});
+  const item={id:Date.now().toString(36)+Math.random().toString(36).slice(2,5),supplier,no:$('no').value.trim(),amount,date,days:Number($('days').value)||0,notes:$('notes').value.trim(),paid:0,pays:[],created:iso(new Date())};
+  if(entryPhotoData)item.img=entryPhotoData;
+  S.bills.push(item);
+  if(!save()){S.bills.pop();toast('Storage full — backup or remove old photos');return}
+  ['supplier','no','amount','notes'].forEach(k=>$(k).value='');clearEntryPhoto();toast('Bill saved · add the next one');render();$('supplier').focus({preventScroll:true});
 };
 function recordPay(b,v,r,img){
   const bal=info(b).bal;v=Math.min(v,bal);if(!(v>0))return false;
@@ -613,19 +652,12 @@ function fillPayBills(supMap){
   $('payBill').value=(prev==='__all'&&list.length>1)||list.some(x=>x.b.id===prev)?prev:(list[0]?list[0].b.id:'');
   updPayHint();
 }
-function clearPayPhoto(){payPhotoData='';$('payPhoto').value='';$('payPrev').hidden=true;$('payPick').hidden=false;$('payThumb').src=''}
+function clearPayPhoto(){payPhotoData='';$('payCam').value='';$('payPhoto').value='';$('payPrev').hidden=true;$('payPick').hidden=false;$('payThumb').src=''}
 $('paySup').onchange=()=>{fillPayBills()};
 $('payBill').onchange=updPayHint;
 $('payFull').onclick=()=>{const m=getPayMax();if(m>0)$('payAmt').value=Math.round(m*100)/100};
-$('payPhoto').onchange=async e=>{
-  const f=e.target.files[0];if(!f)return;
-  try{
-    const d=await compressPhoto(f);
-    payPhotoData=d;$('payThumb').src=d;$('paySize').textContent='Compressed · '+kb(d)+' (tap to view)';
-    $('payPick').hidden=true;$('payPrev').hidden=false;
-  }catch(x){toast('Could not read that photo')}
-  e.target.value='';
-};
+$('payCam').onchange=e=>pickPhoto(e,'pay');
+$('payPhoto').onchange=e=>pickPhoto(e,'pay');
 $('payClrImg').onclick=clearPayPhoto;
 $('payThumb').onclick=()=>{if(payPhotoData)openImg(payPhotoData,$('paySup').value||'Payment photo','Compressed preview · '+kb(payPhotoData),'inhaero-photo-preview.jpg')};
 $('paySubmit').onclick=()=>{
@@ -681,8 +713,8 @@ const csvRows=rows=>'\ufeff'+rows.map(r=>r.map(csvCell).join(',')).join('\r\n');
 function exportData(kind){
   const stamp=iso(new Date());
   if(kind==='bills'){
-    const rows=[['Supplier','Bill no','Bill date','Credit days','Due date','Amount','Paid','Balance','Status','RT / Receipt numbers','Photos','Note']];
-    S.bills.forEach(b=>{const i=info(b);const lbl={paid:'Paid',overdue:'Overdue',soon:'Due soon',open:'Pending'}[i.st];rows.push([b.supplier,b.no,b.date,b.days,iso(i.due),b.amount,b.paid||0,i.bal,lbl,b.pays.map(p=>p.r).filter(Boolean).join('; '),b.pays.filter(p=>p.img).length,b.notes])});
+    const rows=[['Supplier','Bill no','Bill date','Credit days','Due date','Amount','Paid','Balance','Status','RT / Receipt numbers','Bill photo','Payment photos','Note']];
+    S.bills.forEach(b=>{const i=info(b);const lbl={paid:'Paid',overdue:'Overdue',soon:'Due soon',open:'Pending'}[i.st];rows.push([b.supplier,b.no,b.date,b.days,iso(i.due),b.amount,b.paid||0,i.bal,lbl,b.pays.map(p=>p.r).filter(Boolean).join('; '),b.img?'Yes':'No',b.pays.filter(p=>p.img).length,b.notes])});
     dl('inhaero-bills-'+stamp+'.csv',csvRows(rows),'text/csv;charset=utf-8');
   }else if(kind==='payments'){
     const rows=[['Payment date','Supplier','Bill no','Bill amount','Amount paid','RT / Receipt no','Photo attached']];
@@ -750,7 +782,7 @@ $('pin').addEventListener('input',()=>{$('pin').value=$('pin').value.replace(/\D
 $('doReset').onclick=()=>{
   try{localStorage.removeItem(KEY)}catch(e){}
   S={bills:[],budget:1000,defDays:90};showAll=false;listF='pending';srchF='pending';pinTries=0;pinLockUntil=0;listPhotos={};
-  clearPayPhoto();$('payAmt').value='';$('payRt').value='';
+  clearEntryPhoto();clearPayPhoto();$('payAmt').value='';$('payRt').value='';
   $('days').value=S.defDays;$('date').value=iso(new Date());['supplier','no','amount','notes'].forEach(k=>$(k).value='');$('rst').value='';
   modal(0);render();dueUpd();toast('All data cleared');
 };
