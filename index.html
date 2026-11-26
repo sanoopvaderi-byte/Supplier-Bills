@@ -856,7 +856,6 @@ const firebaseConfig={
   messagingSenderId:"260240058364"
 };
 
-const DB_ID="supplier-bills-db";
 let db=null,lastSyncAt=0;
 
 function billPayload(b){
@@ -1005,9 +1004,9 @@ window.fbSyncNow=manual=>flushPending(manual);
 try{
   const app=initializeApp(firebaseConfig);
   try{
-    db=initializeFirestore(app,{localCache:persistentLocalCache({tabManager:persistentMultipleTabManager()})},DB_ID);
+    db=initializeFirestore(app,{localCache:persistentLocalCache({tabManager:persistentMultipleTabManager()})});
   }catch(e){
-    db=getFirestore(app,DB_ID);
+    db=getFirestore(app);
   }
 
   onSnapshot(collection(db,'bills'),{includeMetadataChanges:true},snap=>{

@@ -1,9 +1,6 @@
 {
   "firestore": {
     "rules": "firestore.rules",
-    "indexes": "firestore.indexes.json",
-    "edition": "enterprise",
-    "database": "supplier-bills-db",
-    "location": "asia-south1"
+    "indexes": "firestore.indexes.json"
   }
 }
