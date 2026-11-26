@@ -110,9 +110,9 @@ input:focus,select:focus{outline:0;border-color:var(--brand);box-shadow:0 0 0 4p
 .btn.sm{min-height:40px;padding:8px 14px;font-size:.88rem;border-radius:11px}
 .btn.ok{background:var(--green-t);color:var(--green);box-shadow:none}
 .btn.bad{background:var(--red-t);color:var(--red);box-shadow:none}
-.chips{display:flex;gap:8px;overflow-x:auto;padding:2px 0 4px;scrollbar-width:none}
+.chips{display:flex;gap:6px;overflow-x:auto;padding:2px 0 4px;scrollbar-width:none}
 .chips::-webkit-scrollbar{display:none}
-.chips button{flex:1 0 auto;min-height:40px;padding:7px 12px;border-radius:99px;font-weight:600;font-size:.86rem;background:var(--surface);border:1.5px solid var(--line);color:var(--mute);white-space:nowrap}
+.chips button{flex:1 0 auto;min-height:40px;padding:7px 10px;border-radius:99px;font-weight:600;font-size:.82rem;background:var(--surface);border:1.5px solid var(--line);color:var(--mute);white-space:nowrap}
 .chips.wrap{flex-wrap:wrap;overflow:visible}
 .chips.wrap button{flex:1 1 calc(25% - 8px);padding:7px 4px}
 input[type=file]{padding:9px 12px;font-size:.9rem}
@@ -574,33 +574,41 @@ function render(){
   // list
   const f=listF,rawQ=$('q').value,q=rawQ.trim().toLowerCase();
   $('qClr').hidden=!rawQ;
-  const cnt={pending:0,overdue:0,paid:0,all:S.bills.length};S.bills.forEach(b=>{const i=info(b);if(i.bal>0)cnt.pending++;if(i.st==='overdue')cnt.overdue++;if(i.bal<=0)cnt.paid++});
-  chips($('fchips'),[['pending','Pending '+cnt.pending],['overdue','Overdue '+cnt.overdue],['paid','Paid '+cnt.paid],['all','All '+cnt.all]],f,'data-f');
+  const cnt={pending:0,overdue:0,paid:0,closed:0};S.bills.forEach(b=>{const i=info(b);if(i.bal>0)cnt.pending++;if(i.st==='overdue')cnt.overdue++;if(b.paid>0)cnt.paid++;if(i.bal<=0)cnt.closed++});
+  chips($('fchips'),[['pending','Pending '+cnt.pending],['overdue','Overdue '+cnt.overdue],['paid','Paid '+cnt.paid],['closed','Closed bill '+cnt.closed]],f,'data-f');
   const rows=S.bills.map(b=>({b,i:info(b)})).filter(x=>{
-    if(f==='pending'&&x.i.bal<=0)return false;if(f==='overdue'&&x.i.st!=='overdue')return false;if(f==='paid'&&x.i.bal>0)return false;
-    return !q||(x.b.supplier+' '+(x.b.no||'')).toLowerCase().includes(q)}).sort((a,c)=>a.i.due-c.i.due);
-  if(!q&&(f==='pending'||f==='all')){
+    if(f==='pending'&&x.i.bal<=0)return false;if(f==='overdue'&&x.i.st!=='overdue')return false;if(f==='paid'&&!(x.b.paid>0))return false;if(f==='closed'&&x.i.bal>0)return false;
+    return !q||(x.b.supplier+' '+(x.b.no||'')).toLowerCase().includes(q)}).sort((a,c)=>{
+      if(f==='closed'){
+        const ad=(a.b.pays.length?a.b.pays[a.b.pays.length-1].d:a.b.date),cd=(c.b.pays.length?c.b.pays[c.b.pays.length-1].d:c.b.date);
+        return ad<cd?1:ad>cd?-1:0;
+      }
+      return a.i.due-c.i.due;
+    });
+  if(!q&&f==='pending'){
     if(!rows.length){
-      $('list').innerHTML=`<div class="card">${empty(f==='pending'?'check':'inbox',f==='pending'?'No pending bills right now.':'No bills yet.')}</div>`;
+      $('list').innerHTML=`<div class="card">${empty('check','No pending bills right now.')}</div>`;
     }else{
       const gsup={};let totVal=0;
-      rows.forEach(({b,i})=>{const val=f==='pending'?i.bal:b.amount;totVal+=val;const g=gsup[b.supplier]=gsup[b.supplier]||{n:0,v:0,p:0};g.n++;g.v+=val;g.p+=i.bal});
+      rows.forEach(({b,i})=>{totVal+=i.bal;const g=gsup[b.supplier]=gsup[b.supplier]||{n:0,v:0,p:0};g.n++;g.v+=i.bal;g.p+=i.bal});
       const skeys=Object.keys(gsup).sort((a,b)=>gsup[b].p-gsup[a].p||a.localeCompare(b));
-      const title=f==='pending'?rows.length+' pending bill'+(rows.length===1?'':'s'):rows.length+' total bill'+(rows.length===1?'':'s');
-      const sub=f==='pending'?'Search or tap a supplier to view full bills':cnt.pending+' pending · '+cnt.paid+' paid · tap a supplier to view';
-      $('list').innerHTML=`<div class="card"><div class="cntbox"><div><div class="cntnum">${title}</div><div class="meta">${sub}</div></div><div class="amt">${inr(totVal)}<small>${f==='pending'?'pending':'billed'}</small></div></div>`+
-      skeys.map(k=>{const g=gsup[k];return `<button class="row" type="button" data-qsup="${esc(k)}"><span class="av">${esc(k.trim().charAt(0).toUpperCase()||'?')}</span><span class="tx"><b>${esc(k)}</b><span>${g.n} bill${g.n>1?'s':''}</span></span><span class="amt">${inr(g.v)}<small>${f==='pending'?'pending':(g.p>0?'bal '+inr(g.p):'settled')}</small></span></button>`}).join('')+`</div>`;
+      const title=rows.length+' pending bill'+(rows.length===1?'':'s');
+      $('list').innerHTML=`<div class="card"><div class="cntbox"><div><div class="cntnum">${title}</div><div class="meta">Search or tap a supplier to view full bills</div></div><div class="amt">${inr(totVal)}<small>pending</small></div></div>`+
+      skeys.map(k=>{const g=gsup[k];return `<button class="row" type="button" data-qsup="${esc(k)}"><span class="av">${esc(k.trim().charAt(0).toUpperCase()||'?')}</span><span class="tx"><b>${esc(k)}</b><span>${g.n} bill${g.n>1?'s':''}</span></span><span class="amt">${inr(g.v)}<small>pending</small></span></button>`}).join('')+`</div>`;
     }
   }else{
-    $('list').innerHTML=rows.length?rows.map(({b,i})=>{
+    const closedSum=(f==='closed'&&rows.length)?`<div class="card"><div class="cntbox" style="padding-bottom:0"><div><div class="cntnum">${rows.length} closed bill${rows.length===1?'':'s'}</div><div class="meta">Fully settled bills with payment &amp; receipt details</div></div><div class="amt">${inr(rows.reduce((s,x)=>s+x.b.amount,0))}<small>settled</small></div></div></div>`:'';
+    $('list').innerHTML=rows.length?closedSum+rows.map(({b,i})=>{
       const pc=Math.min(100,Math.round((b.paid||0)/b.amount*100));
-      return `<div class="bcard ${i.st}"><div class="btop"><div><b>${esc(b.supplier)}</b><div class="meta">Bill ${esc(b.no||'–')} · ${fmt(b.date)}</div></div><span class="tag ${i.st}">${dueText(i)}</span></div>
+      const closedOn=i.bal<=0?(b.pays.length?b.pays[b.pays.length-1].d:b.date):'';
+      const tagLbl=i.st==='paid'?'Closed':dueText(i);
+      return `<div class="bcard ${i.st}"><div class="btop"><div><b>${esc(b.supplier)}</b><div class="meta">Bill ${esc(b.no||'–')} · dated ${fmt(b.date)}</div></div><span class="tag ${i.st}">${tagLbl}</span></div>
       <div class="bar"><i style="width:${pc}%"></i></div>
       <div class="bnums"><span>Amount <b>${inr(b.amount)}</b></span><span>Paid <b>${inr(b.paid||0)}</b></span><span>Balance <b>${inr(i.bal)}</b></span></div>
-      <div class="meta">Due ${fmt(iso(i.due))}${b.notes?' · '+esc(b.notes):''}${b.img?` <button type="button" class="pthumb" data-bimg="${b.id}"><svg class="i"><use href="#i-cam"/></svg>Bill photo</button>`:''}</div>
-      ${b.pays.length?'<div class="phist">'+b.pays.map((p,idx)=>`<div class="pl"><span>${fmtShort(p.d)}${p.r?' · RT/Rcpt <b>'+esc(p.r)+'</b>':''}${p.img?` <button type="button" class="pthumb" data-img="${b.id}|${idx}"><svg class="i"><use href="#i-cam"/></svg>Photo</button>`:''}</span><span>${inr(p.a)}</span></div>`).join('')+'</div>':''}
+      <div class="meta">${closedOn?'Closed on '+fmt(closedOn)+' · due was '+fmt(iso(i.due)):'Due '+fmt(iso(i.due))}${b.notes?' · '+esc(b.notes):''}${b.img?` <button type="button" class="pthumb" data-bimg="${b.id}"><svg class="i"><use href="#i-cam"/></svg>Bill photo</button>`:''}</div>
+      ${b.pays.length?'<div class="phist">'+b.pays.map((p,idx)=>`<div class="pl"><span>${fmtShort(p.d)}${p.r?' · RT/Rcpt <b>'+esc(p.r)+'</b>':''}${p.img?` <button type="button" class="pthumb" data-img="${b.id}|${idx}"><svg class="i"><use href="#i-cam"/></svg>Photo</button>`:''}</span><span>${inr(p.a)}</span></div>`).join('')+'</div>':(i.bal<=0?`<div class="phist"><div class="pl"><span>Settled in full</span><span>${inr(b.paid||b.amount)}</span></div></div>`:'')}
       ${i.bal>0?`<div class="payform"><span class="money"><input type="number" min="0" step="0.01" inputmode="decimal" placeholder="Amount" id="p-${b.id}"></span><input id="r-${b.id}" placeholder="RT / Receipt no."><label class="pbtn sm${listPhotos[b.id]?' has':''}" id="plbl-${b.id}"><input type="file" accept="image/*" data-limg="${b.id}"><svg class="i"><use href="#i-cam"/></svg><span>${listPhotos[b.id]?'Photo ('+kb(listPhotos[b.id])+')':'Photo'}</span></label><button class="btn sm" type="button" data-pay="${b.id}">Record payment</button></div>`:''}
-      <div class="acts"><button class="btn bad sm" type="button" data-del="${b.id}">Delete</button></div></div>`}).join(''):`<div class="card">${empty('inbox','Nothing to show here.')}</div>`;
+      <div class="acts"><button class="btn bad sm" type="button" data-del="${b.id}">Delete</button></div></div>`}).join(''):`<div class="card">${empty(f==='closed'?'check':'inbox',f==='closed'?'No closed bills yet.':'Nothing to show here.')}</div>`;
   }
   // search
   chips($('schips'),[['pending','Pending only'],['all','All bills']],srchF,'data-sf');
