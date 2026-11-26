@@ -31,6 +31,13 @@ svg.i{width:1.25em;height:1.25em;fill:none;stroke:currentColor;stroke-width:1.9;
 .ttl{flex:1;min-width:0;line-height:1.15}
 .ttl b{display:block;font-size:1.06rem;letter-spacing:-.01em}
 .ttl span{font-size:.78rem;color:var(--mute)}
+.cstatus{display:inline-flex;align-items:center;gap:5px;margin-top:2px;font-size:.75rem;font-weight:600;color:var(--mute);padding:2px 0;min-height:22px}
+.cdot{width:7px;height:7px;border-radius:50%;background:var(--mute);flex:none}
+.cstatus.ok{color:var(--green)}.cstatus.ok .cdot{background:#22c55e}
+.cstatus.sync{color:var(--blue)}.cstatus.sync .cdot{background:#3b82f6;animation:pulse 1s infinite}
+.cstatus.warn{color:var(--amber)}.cstatus.warn .cdot{background:#f59e0b}
+.cstatus.bad{color:var(--red)}.cstatus.bad .cdot{background:#ef4444}
+@keyframes pulse{50%{opacity:.35}}
 .icon-btn{width:42px;height:42px;border-radius:13px;display:grid;place-items:center;background:var(--surface);border:1px solid var(--line);color:var(--ink);box-shadow:0 1px 2px rgba(15,23,42,.04)}
 .icon-btn:active{transform:scale(.96)}
 main{padding:4px 16px 0;display:grid;gap:16px}
@@ -217,7 +224,7 @@ td:not(:first-child),th:not(:first-child){text-align:right;font-variant-numeric:
 <div class="app">
   <header class="topbar">
     <div class="logo"><svg class="i"><use href="#i-pill"/></svg></div>
-    <div class="ttl"><b>Inhaero Pharmacy</b><span>Purchases &amp; Payments</span></div>
+    <div class="ttl"><b>Inhaero Pharmacy</b><button type="button" class="cstatus" id="cloudPill" title="Tap to sync with Firebase"><i class="cdot"></i><span id="cloudTxt">Connecting cloud…</span></button></div>
     <button class="icon-btn" type="button" data-go="search" aria-label="Search"><svg class="i"><use href="#i-search"/></svg></button>
     <button class="icon-btn" type="button" data-go="settings" aria-label="Settings"><svg class="i"><use href="#i-gear"/></svg></button>
   </header>
@@ -360,6 +367,11 @@ td:not(:first-child),th:not(:first-child){text-align:right;font-variant-numeric:
     <!-- SETTINGS -->
     <section class="view" id="v-settings" hidden>
       <div class="card">
+        <div class="sec" style="margin-bottom:4px"><h2>Cloud backup (Firebase)</h2><span class="tag open" id="cloudSetTag">Connecting</span></div>
+        <p class="hint" id="cloudSetInfo" style="margin:0 0 12px">Bills, payments, receipt numbers and photos auto-backup to Firebase and sync across all your devices.</p>
+        <button class="btn" id="syncNowBtn" type="button" style="width:100%"><svg class="i"><use href="#i-up"/></svg>Sync / Backup now</button>
+      </div>
+      <div class="card">
         <div class="setrow"><div><b>Default credit days</b><div class="meta">Used for new bills</div></div><input id="sdays" type="number" min="0" inputmode="numeric" style="width:96px;text-align:center"></div>
       </div>
       <div class="card">
@@ -374,11 +386,11 @@ td:not(:first-child),th:not(:first-child){text-align:right;font-variant-numeric:
       </div>
       <div class="card">
         <label>Restore from backup<input id="rst" type="file" accept=".json"></label>
-        <p class="hint" style="margin-top:10px">Data is saved in this browser only. Download a backup regularly.</p>
+        <p class="hint" style="margin-top:10px">Data is saved in Firebase cloud and cached on this device for offline use.</p>
       </div>
       <div class="card" style="border-color:color-mix(in srgb,var(--red) 40%,var(--line))">
         <h2 style="color:var(--red);margin-bottom:4px">Danger zone</h2>
-        <p class="hint" style="margin:0 0 12px">Clears every bill, payment and setting from this device. Locked with a PIN.</p>
+        <p class="hint" style="margin:0 0 12px">Clears every bill, payment, photo and cloud backup. Locked with a PIN.</p>
         <button class="btn bad" id="resetBtn" type="button" style="width:100%"><svg class="i"><use href="#i-lock"/></svg>Reset all data</button>
       </div>
     </section>
@@ -431,10 +443,31 @@ td:not(:first-child),th:not(:first-child){text-align:right;font-variant-numeric:
 <script>
 const $=id=>document.getElementById(id);
 const KEY='clinic-supplier-bills-v1';
-let S={bills:[],budget:1000,defDays:90};
+let S={bills:[],budget:1000,defDays:90,defDaysAt:0,seeded:false,dirty:{},dels:{}};
 try{const r=localStorage.getItem(KEY);if(r){const p=JSON.parse(r);if(p&&Array.isArray(p.bills))S=Object.assign(S,p)}}catch(e){}
-function norm(){S.bills.forEach(b=>{b.amount=Number(b.amount)||0;b.paid=Number(b.paid)||0;b.days=Number(b.days)||0;if(!Array.isArray(b.pays))b.pays=[]})}norm();
-function save(){try{localStorage.setItem(KEY,JSON.stringify(S));return true}catch(e){return false}}
+function norm(){
+  if(!S.dirty||typeof S.dirty!=='object')S.dirty={};
+  if(!S.dels||typeof S.dels!=='object')S.dels={};
+  S.defDays=Number.isFinite(Number(S.defDays))?Math.max(0,Number(S.defDays)):90;
+  S.defDaysAt=Number(S.defDaysAt)||0;
+  S.bills.forEach(b=>{b.amount=Number(b.amount)||0;b.paid=Number(b.paid)||0;b.days=Number(b.days)||0;b.updatedAt=Number(b.updatedAt)||Date.now();if(!Array.isArray(b.pays))b.pays=[]});
+}norm();
+function save(){
+  try{localStorage.setItem(KEY,JSON.stringify(S));return true}
+  catch(e){
+    try{
+      const slim=Object.assign({},S,{bills:S.bills.map(b=>Object.assign({},b,{img:'',pays:(b.pays||[]).map(p=>({d:p.d,a:p.a,r:p.r||''}))}))});
+      localStorage.setItem(KEY,JSON.stringify(slim));return true;
+    }catch(x){return false}
+  }
+}
+function setCloudUI(kind,shortTxt,detailTxt){
+  const p=$('cloudPill'),t=$('cloudTxt'),st=$('cloudSetTag'),si=$('cloudSetInfo');
+  if(p)p.className='cstatus '+(kind||'');
+  if(t)t.textContent=shortTxt||'';
+  if(st){st.textContent=shortTxt||'';st.className='tag '+(kind==='ok'?'paid':kind==='sync'?'open':kind==='warn'?'soon':'overdue')}
+  if(si&&detailTxt)si.textContent=detailTxt;
+}
 const inr=n=>'₹'+Math.round(n).toLocaleString('en-IN');
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const today=()=>{const d=new Date();d.setHours(0,0,0,0);return d};
@@ -619,21 +652,22 @@ $('entryThumb').onclick=()=>{if(entryPhotoData)openImg(entryPhotoData,$('supplie
 $('add').onclick=()=>{
   const supplier=$('supplier').value.trim(),amount=parseFloat($('amount').value),date=$('date').value;
   if(!supplier||!(amount>0)||!date){toast('Enter supplier, amount and bill date');return}
-  const item={id:Date.now().toString(36)+Math.random().toString(36).slice(2,5),supplier,no:$('no').value.trim(),amount,date,days:Number($('days').value)||0,notes:$('notes').value.trim(),paid:0,pays:[],created:iso(new Date())};
+  const item={id:Date.now().toString(36)+Math.random().toString(36).slice(2,5),supplier,no:$('no').value.trim(),amount,date,days:Number($('days').value)||0,notes:$('notes').value.trim(),paid:0,pays:[],created:iso(new Date()),updatedAt:Date.now()};
   if(entryPhotoData)item.img=entryPhotoData;
-  S.bills.push(item);
-  if(!save()){S.bills.pop();toast('Storage full — backup or remove old photos');return}
+  S.bills.push(item);S.dirty[item.id]=true;delete S.dels[item.id];
+  if(!save()){S.bills.pop();delete S.dirty[item.id];toast('Storage full — backup or remove old photos');return}
   ['supplier','no','amount','notes'].forEach(k=>$(k).value='');clearEntryPhoto();toast('Bill saved · add the next one');render();$('supplier').focus({preventScroll:true});
+  window.fbPushBill?.(item);
 };
 function recordPay(b,v,r,img){
   const bal=info(b).bal;v=Math.min(v,bal);if(!(v>0))return false;
-  const prevPaid=b.paid||0,prevLen=b.pays.length;
-  b.paid=prevPaid+v;
+  const prevPaid=b.paid||0,prevLen=b.pays.length,prevAt=b.updatedAt;
+  b.paid=prevPaid+v;b.updatedAt=Date.now();
   const entry={d:iso(new Date()),a:v,r:(r||'').trim()};
   if(img)entry.img=img;
-  b.pays.push(entry);
-  if(!save()){b.paid=prevPaid;b.pays.length=prevLen;toast('Storage full — backup or remove old photos');return false}
-  render();toast(inr(v)+' payment recorded');return true;
+  b.pays.push(entry);S.dirty[b.id]=true;delete S.dels[b.id];
+  if(!save()){b.paid=prevPaid;b.pays.length=prevLen;b.updatedAt=prevAt;delete S.dirty[b.id];toast('Storage full — backup or remove old photos');return false}
+  render();toast(inr(v)+' payment recorded');window.fbPushBill?.(b);return true;
 }
 function getPayMax(){
   const sup=$('paySup').value,bid=$('payBill').value;
@@ -668,17 +702,17 @@ $('paySubmit').onclick=()=>{
   if(amt>maxBal+0.005){toast('Amount exceeds balance (max '+inr(maxBal)+')');$('payAmt').focus();return}
   if(bid==='__all'){
     const list=S.bills.map(b=>({b,i:info(b)})).filter(x=>x.i.bal>0&&x.b.supplier===sup).sort((a,c)=>a.i.due-c.i.due);
-    const snap=list.map(x=>({b:x.b,p:x.b.paid||0,l:x.b.pays.length}));
-    let rem=amt,img=payPhotoData;const d=iso(new Date());
+    const snap=list.map(x=>({b:x.b,p:x.b.paid||0,l:x.b.pays.length,u:x.b.updatedAt}));
+    let rem=amt,img=payPhotoData;const d=iso(new Date()),now=Date.now(),touched=[];
     for(const x of list){
       if(rem<=0.005)break;
       const sl=Math.round(Math.min(rem,x.i.bal)*100)/100;rem=Math.max(0,rem-sl);
-      x.b.paid=(x.b.paid||0)+sl;
+      x.b.paid=(x.b.paid||0)+sl;x.b.updatedAt=now;
       const ent={d,a:sl,r:rt};if(img){ent.img=img;img=''}
-      x.b.pays.push(ent);
+      x.b.pays.push(ent);S.dirty[x.b.id]=true;delete S.dels[x.b.id];touched.push(x.b);
     }
-    if(!save()){snap.forEach(s=>{s.b.paid=s.p;s.b.pays.length=s.l});toast('Storage full — backup or remove old photos');return}
-    toast(inr(amt)+' payment recorded across '+sup);
+    if(!save()){snap.forEach(s=>{s.b.paid=s.p;s.b.pays.length=s.l;s.b.updatedAt=s.u;delete S.dirty[s.b.id]});toast('Storage full — backup or remove old photos');return}
+    toast(inr(amt)+' payment recorded across '+sup);window.fbPushBills?.(touched);
   }else{
     const b=S.bills.find(x=>x.id===bid);
     if(!b||!recordPay(b,amt,rt,payPhotoData))return;
@@ -702,9 +736,9 @@ $('list').onclick=e=>{
   const p=bt.dataset.pay,d=bt.dataset.del;
   if(p){const v=parseFloat($('p-'+p).value);if(!(v>0)){toast('Enter the amount paid');return}
     if(recordPay(S.bills.find(x=>x.id===p),v,$('r-'+p).value,listPhotos[p]||''))delete listPhotos[p];}
-  if(d&&confirm('Delete this bill?')){delete listPhotos[d];S.bills=S.bills.filter(x=>x.id!==d);save();render();toast('Bill deleted')}
+  if(d&&confirm('Delete this bill?')){delete listPhotos[d];delete S.dirty[d];S.dels[d]=true;S.bills=S.bills.filter(x=>x.id!==d);save();render();toast('Bill deleted');window.fbDeleteBill?.(d)}
 };
-$('sdays').onchange=()=>{S.defDays=Math.max(0,Number($('sdays').value)||0);$('days').value=S.defDays;save();render();dueUpd()};
+$('sdays').onchange=()=>{S.defDays=Math.max(0,Number($('sdays').value)||0);S.defDaysAt=Date.now();$('days').value=S.defDays;save();render();dueUpd();window.fbPushSettings?.()};
 $('q').oninput=render;$('sq').oninput=render;
 $('viewAll').onclick=()=>{showAll=!showAll;render()};
 function dl(name,text,type){const u=URL.createObjectURL(new Blob([text],{type})),a=document.createElement('a');a.href=u;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(u),1000)}
@@ -727,7 +761,7 @@ function exportData(kind){
     Object.keys(sup).sort((a,b)=>(sup[b].a-sup[b].p)-(sup[a].a-sup[a].p)||a.localeCompare(b)).forEach(k=>{const g=sup[k];rows.push([k,g.n,g.a,g.p,Math.max(0,g.a-g.p)])});
     dl('inhaero-suppliers-'+stamp+'.csv',csvRows(rows),'text/csv;charset=utf-8');
   }else{
-    dl('inhaero-backup-'+stamp+'.json',JSON.stringify(S),'application/json');
+    dl('inhaero-backup-'+stamp+'.json',JSON.stringify({bills:S.bills,budget:S.budget,defDays:S.defDays}),'application/json');
   }
   toast('Export downloaded');
 }
@@ -756,7 +790,7 @@ async function pinOk(v){
 let pinTries=0,pinLockUntil=0;
 function modal(step){$('modal').hidden=step===0;$('mStep1').hidden=step!==1;$('mStep2').hidden=step!==2;
   if(step===1){$('pin').value='';$('pinErr').hidden=true;setTimeout(()=>$('pin').focus(),50)}
-  if(step===2)$('mWarn').textContent='This permanently deletes '+S.bills.length+' bill'+(S.bills.length===1?'':'s')+', all payments and receipt numbers from this device. This cannot be undone.';
+  if(step===2)$('mWarn').textContent='This permanently deletes '+S.bills.length+' bill'+(S.bills.length===1?'':'s')+', all payments, photos and Firebase cloud backup. This cannot be undone.';
   document.body.style.overflow=step===0?'':'hidden'}
 $('resetBtn').onclick=()=>modal(1);
 let curImg={src:'',name:'receipt.jpg'};
@@ -780,16 +814,271 @@ $('pinOk').onclick=tryPin;
 $('pin').addEventListener('keydown',e=>{if(e.key==='Enter')tryPin()});
 $('pin').addEventListener('input',()=>{$('pin').value=$('pin').value.replace(/\D/g,'')});
 $('doReset').onclick=()=>{
+  const prevIds=S.bills.map(b=>b.id);
   try{localStorage.removeItem(KEY)}catch(e){}
-  S={bills:[],budget:1000,defDays:90};showAll=false;listF='pending';srchF='pending';pinTries=0;pinLockUntil=0;listPhotos={};
+  S={bills:[],budget:1000,defDays:90,defDaysAt:Date.now(),seeded:true,dirty:{},dels:{}};
+  prevIds.forEach(id=>{S.dels[id]=true});save();
+  showAll=false;listF='pending';srchF='pending';pinTries=0;pinLockUntil=0;listPhotos={};
   clearEntryPhoto();clearPayPhoto();$('payAmt').value='';$('payRt').value='';
   $('days').value=S.defDays;$('date').value=iso(new Date());['supplier','no','amount','notes'].forEach(k=>$(k).value='');$('rst').value='';
   modal(0);render();dueUpd();toast('All data cleared');
+  window.fbResetAll?.(prevIds);
 };
-$('rst').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const p=JSON.parse(r.result);if(Array.isArray(p.bills)){S=Object.assign({budget:1000,defDays:90},p);norm();save();render();toast('Backup restored')}}catch(x){toast('Could not read that file')}$('rst').value=''};r.readAsText(f)};
+$('rst').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const p=JSON.parse(r.result);if(Array.isArray(p.bills)){
+  const oldIds=S.bills.map(b=>b.id),now=Date.now();
+  S=Object.assign({budget:1000,defDays:90},p,{seeded:true,defDaysAt:now,dirty:{},dels:{}});
+  norm();const keep=new Set(S.bills.map(b=>b.id));
+  S.bills.forEach(b=>{b.updatedAt=now;S.dirty[b.id]=true});
+  oldIds.forEach(id=>{if(!keep.has(id))S.dels[id]=true});
+  save();render();toast('Backup restored');window.fbSyncNow?.(true);
+}}catch(x){toast('Could not read that file')}$('rst').value=''};r.readAsText(f)};
+$('cloudPill').onclick=()=>window.fbSyncNow?window.fbSyncNow(true):toast('Connecting to Firebase…');
+$('syncNowBtn').onclick=()=>window.fbSyncNow?window.fbSyncNow(true):toast('Connecting to Firebase…');
+window.APP={get:()=>S,set:v=>{S=v},save,norm,render,dueUpd,iso,toast,setCloudUI};
 let lastDay=iso(new Date());
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&iso(new Date())!==lastDay){lastDay=iso(new Date());render()}});
 route();
+</script>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js";
+import {
+  initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager,
+  collection, doc, setDoc, deleteDoc, writeBatch, getDocs, onSnapshot
+} from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
+
+const firebaseConfig={
+  projectId:"inhaero-supplier-bills",
+  appId:"1:260240058364:web:8508df82e4365523b8f479",
+  storageBucket:"inhaero-supplier-bills.firebasestorage.app",
+  apiKey:"AIzaSyB5eEPxnbEFYu-k6rDqqbtTl_kEDGr9xgY",
+  authDomain:"inhaero-supplier-bills.firebaseapp.com",
+  messagingSenderId:"260240058364"
+};
+
+const DB_ID="supplier-bills-db";
+let db=null,lastSyncAt=0;
+
+function billPayload(b){
+  const o={
+    id:String(b.id).slice(0,64),
+    supplier:String(b.supplier||'Supplier').trim().slice(0,200)||'Supplier',
+    no:String(b.no||'').slice(0,100),
+    amount:Math.min(100000000,Math.max(0.01,Number(b.amount)||0.01)),
+    date:/^\d{4}-\d{2}-\d{2}$/.test(String(b.date||''))?b.date:APP.iso(new Date()),
+    days:Math.min(3650,Math.max(0,Number(b.days)||0)),
+    notes:String(b.notes||'').slice(0,500),
+    paid:Math.min(100000000,Math.max(0,Number(b.paid)||0)),
+    pays:Array.isArray(b.pays)?b.pays.slice(0,200).map(p=>{
+      const x={d:String(p.d||APP.iso(new Date())),a:Number(p.a)||0,r:String(p.r||'')};
+      if(p.img)x.img=String(p.img);
+      return x;
+    }):[],
+    updatedAt:Math.max(1,Number(b.updatedAt)||Date.now())
+  };
+  if(b.created&&/^\d{4}-\d{2}-\d{2}$/.test(String(b.created)))o.created=b.created;
+  if(b.img&&typeof b.img==='string'&&b.img.length<=250000)o.img=b.img;
+  return o;
+}
+
+function showSynced(){
+  const S=APP.get(),n=S.bills.length;
+  const tm=lastSyncAt?new Date(lastSyncAt).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}):'';
+  APP.setCloudUI('ok','Cloud synced','Backed up to Firebase ('+n+' bill'+(n===1?'':'s')+(tm?' · '+tm:'')+'). Syncs automatically across devices.');
+}
+
+async function flushPending(manual){
+  if(!db)return;
+  const S=APP.get();
+  if(!navigator.onLine){APP.setCloudUI('warn','Offline','Offline — changes saved on device and will sync automatically when back online.');if(manual)APP.toast('Offline — saved locally');return}
+  APP.setCloudUI('sync','Syncing…','Syncing bills and photos with Firebase…');
+  try{
+    const delIds=Object.keys(S.dels||{});
+    const dirtyIds=Object.keys(S.dirty||{});
+    const ops=[];
+    delIds.forEach(id=>ops.push({t:'del',id}));
+    dirtyIds.forEach(id=>{
+      const b=S.bills.find(x=>x.id===id);
+      if(b)ops.push({t:'set',id,data:billPayload(b)});
+    });
+    for(let i=0;i<ops.length;i+=400){
+      const batch=writeBatch(db);
+      ops.slice(i,i+400).forEach(op=>{
+        const ref=doc(db,'bills',op.id);
+        if(op.t==='del')batch.delete(ref);else batch.set(ref,op.data);
+      });
+      await batch.commit();
+    }
+    delIds.forEach(id=>delete S.dels[id]);
+    dirtyIds.forEach(id=>delete S.dirty[id]);
+    await setDoc(doc(db,'app_meta','settings'),{
+      defDays:Math.min(3650,Math.max(0,Number(S.defDays)||0)),
+      updatedAt:Math.max(1,Number(S.defDaysAt)||Date.now())
+    });
+    S.seeded=true;APP.save();lastSyncAt=Date.now();showSynced();
+    if(manual)APP.toast('Cloud backup synced ('+S.bills.length+' bill'+(S.bills.length===1?'':'s')+')');
+  }catch(err){
+    console.error('Firebase sync error:',err);
+    APP.setCloudUI('bad','Sync error','Could not reach Firebase right now. Changes stay saved on this device.');
+    if(manual)APP.toast('Sync failed — saved locally');
+  }
+}
+
+window.fbPushBill=async b=>{
+  if(!db)return;
+  const S=APP.get();
+  APP.setCloudUI('sync','Syncing…');
+  try{
+    await setDoc(doc(db,'bills',String(b.id)),billPayload(b));
+    delete S.dirty[b.id];S.seeded=true;APP.save();lastSyncAt=Date.now();showSynced();
+  }catch(e){
+    console.error('Firebase push bill error:',e);
+    APP.setCloudUI(navigator.onLine?'bad':'warn',navigator.onLine?'Sync pending':'Offline');
+  }
+};
+
+window.fbPushBills=async list=>{
+  if(!db||!list||!list.length)return;
+  const S=APP.get();
+  APP.setCloudUI('sync','Syncing…');
+  try{
+    for(let i=0;i<list.length;i+=400){
+      const batch=writeBatch(db);
+      list.slice(i,i+400).forEach(b=>batch.set(doc(db,'bills',String(b.id)),billPayload(b)));
+      await batch.commit();
+    }
+    list.forEach(b=>delete S.dirty[b.id]);S.seeded=true;APP.save();lastSyncAt=Date.now();showSynced();
+  }catch(e){
+    console.error('Firebase batch push error:',e);
+    APP.setCloudUI(navigator.onLine?'bad':'warn',navigator.onLine?'Sync pending':'Offline');
+  }
+};
+
+window.fbDeleteBill=async id=>{
+  if(!db)return;
+  const S=APP.get();
+  APP.setCloudUI('sync','Syncing…');
+  try{
+    await deleteDoc(doc(db,'bills',String(id)));
+    delete S.dels[id];APP.save();lastSyncAt=Date.now();showSynced();
+  }catch(e){
+    console.error('Firebase delete bill error:',e);
+    APP.setCloudUI(navigator.onLine?'bad':'warn',navigator.onLine?'Sync pending':'Offline');
+  }
+};
+
+window.fbPushSettings=async ()=>{
+  if(!db)return;
+  const S=APP.get();
+  try{
+    await setDoc(doc(db,'app_meta','settings'),{
+      defDays:Math.min(3650,Math.max(0,Number(S.defDays)||0)),
+      updatedAt:Math.max(1,Number(S.defDaysAt)||Date.now())
+    });
+    lastSyncAt=Date.now();showSynced();
+  }catch(e){console.error('Firebase settings push error:',e)}
+};
+
+window.fbResetAll=async prevIds=>{
+  if(!db)return;
+  const S=APP.get();
+  APP.setCloudUI('sync','Clearing cloud…');
+  try{
+    const snap=await getDocs(collection(db,'bills'));
+    const ids=new Set([...(prevIds||[]),...snap.docs.map(d=>d.id)]);
+    const all=[...ids];
+    for(let i=0;i<all.length;i+=400){
+      const batch=writeBatch(db);
+      all.slice(i,i+400).forEach(id=>batch.delete(doc(db,'bills',id)));
+      await batch.commit();
+    }
+    await deleteDoc(doc(db,'app_meta','settings')).catch(()=>{});
+    S.dels={};S.dirty={};S.seeded=true;APP.save();lastSyncAt=Date.now();showSynced();
+  }catch(e){
+    console.error('Firebase reset error:',e);
+    APP.setCloudUI('bad','Sync pending','Local data cleared; cloud reset pending connection.');
+  }
+};
+
+window.fbSyncNow=manual=>flushPending(manual);
+
+try{
+  const app=initializeApp(firebaseConfig);
+  try{
+    db=initializeFirestore(app,{localCache:persistentLocalCache({tabManager:persistentMultipleTabManager()})},DB_ID);
+  }catch(e){
+    db=getFirestore(app,DB_ID);
+  }
+
+  onSnapshot(collection(db,'bills'),{includeMetadataChanges:true},snap=>{
+    const S=APP.get();
+    const fromServer=!snap.metadata.fromCache;
+    if(!fromServer&&snap.empty&&S.bills.length&&!S.seeded)return;
+
+    const remoteMap={};
+    snap.docs.forEach(d=>{if(!S.dels[d.id])remoteMap[d.id]=d.data()});
+
+    const next=[],seen=new Set();
+    let needUpload=false;
+
+    S.bills.forEach(local=>{
+      seen.add(local.id);
+      const rem=remoteMap[local.id];
+      if(rem){
+        if(S.dirty[local.id]&&(Number(local.updatedAt)||0)>=Number(rem.updatedAt||0)){
+          next.push(local);needUpload=true;
+        }else{
+          next.push(rem);delete S.dirty[local.id];
+        }
+      }else{
+        if(S.dirty[local.id]||!S.seeded){
+          S.dirty[local.id]=true;next.push(local);needUpload=true;
+        }
+      }
+    });
+
+    Object.keys(remoteMap).forEach(id=>{
+      if(!seen.has(id))next.push(remoteMap[id]);
+    });
+
+    const changed=JSON.stringify(S.bills)!==JSON.stringify(next);
+    if(changed){S.bills=next;APP.norm()}
+    if(fromServer)S.seeded=true;
+    APP.save();
+    if(changed)APP.render();
+
+    if(fromServer&&(needUpload||Object.keys(S.dels||{}).length)){
+      flushPending(false);
+    }else if(fromServer){
+      lastSyncAt=Date.now();showSynced();
+    }else if(!navigator.onLine){
+      APP.setCloudUI('warn','Offline','Showing cached data. Changes sync automatically when online.');
+    }
+  },err=>{
+    console.error('Firestore bills listener error:',err);
+    APP.setCloudUI('bad','Cloud error','Unable to sync with Firebase: '+(err.code||err.message));
+  });
+
+  onSnapshot(doc(db,'app_meta','settings'),{includeMetadataChanges:true},snap=>{
+    const S=APP.get(),fromServer=!snap.metadata.fromCache;
+    if(!snap.exists()){
+      if(fromServer)window.fbPushSettings();
+      return;
+    }
+    const rem=snap.data();
+    if(rem&&Number(rem.updatedAt||0)>Number(S.defDaysAt||0)){
+      S.defDays=Number(rem.defDays)||0;S.defDaysAt=Number(rem.updatedAt)||0;
+      const dEl=document.getElementById('days');if(dEl)dEl.value=S.defDays;
+      APP.save();APP.render();APP.dueUpd();
+    }
+  },err=>{console.error('Firestore settings listener error:',err)});
+
+  window.addEventListener('online',()=>flushPending(false));
+  window.addEventListener('offline',()=>APP.setCloudUI('warn','Offline','Offline — changes saved on device and will sync automatically when back online.'));
+}catch(e){
+  console.error('Firebase init error:',e);
+  APP.setCloudUI('bad','Cloud unavailable','Running offline on device storage.');
+}
 </script>
 </body>
 </html>

@@ -1,0 +1,144 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Access Model:
+    //   Open clinic device sync without Firebase Auth sign-in (matching
+    //   the clinic's PO-Maker app so staff can open the app directly on
+    //   multiple clinic phones). Because reads and writes are unauthenticated,
+    //   all writes enforce strict document-ID matching, field allowlisting,
+    //   type checks, string length bounds, and numeric bounds.
+    //
+    // Collection: bills
+    // Document ID: {billId} (matches field `id`, 1..64 chars)
+    // Fields:
+    //   - id: string (required, 1..64 chars, must equal document ID {billId})
+    //   - supplier: string (required, 1..200 chars) - Supplier name
+    //   - no: string (required, 0..100 chars) - Bill/invoice number
+    //   - amount: number (required, > 0 and <= 100000000) - Total bill amount
+    //   - date: string (required, 10 chars, YYYY-MM-DD) - Bill date
+    //   - days: number (required, >= 0 and <= 3650) - Credit period in days
+    //   - notes: string (required, 0..500 chars) - Optional bill notes
+    //   - paid: number (required, >= 0 and <= 100000000) - Total paid amount
+    //   - pays: list (required, max 200 items) - Payment history entries
+    //   - created: string (optional, 10 chars, YYYY-MM-DD) - Entry creation date
+    //   - img: string (optional, 0..250000 chars) - Compressed bill photo data URL
+    //   - updatedAt: number (required, > 0) - Last sync timestamp in milliseconds
+    //
+    // Collection: app_meta
+    // Document ID: settings (only 'settings' may be created, updated, or deleted)
+    // Fields:
+    //   - defDays: number (required, >= 0 and <= 3650) - Default credit days
+    //   - updatedAt: number (required, > 0) - Last sync timestamp in milliseconds
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    function hasRequiredFields(data, fields) {
+      return data.keys().hasAll(fields);
+    }
+
+    function hasOnlyAllowedFields(data, fields) {
+      return data.keys().hasOnly(fields);
+    }
+
+    function validStringLength(val, minLen, maxLen) {
+      return val is string
+          && val.size() >= minLen
+          && val.size() <= maxLen;
+    }
+
+    function isValidIsoDate(val) {
+      return val is string
+          && val.size() == 10
+          && val.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
+    }
+
+    function isValidNumberRange(val, minVal, maxVal) {
+      return val is number
+          && val >= minVal
+          && val <= maxVal;
+    }
+
+    function isValidList(val, maxSize) {
+      return val is list
+          && val.size() <= maxSize;
+    }
+
+    function isValidOptionalIsoDate(data, field) {
+      return !(field in data) || isValidIsoDate(data[field]);
+    }
+
+    function isValidOptionalString(data, field, minLen, maxLen) {
+      return !(field in data) || validStringLength(data[field], minLen, maxLen);
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidBill(data, billId) {
+      let required = [
+        'id', 'supplier', 'no', 'amount', 'date',
+        'days', 'notes', 'paid', 'pays', 'updatedAt'
+      ];
+      let allowed = [
+        'id', 'supplier', 'no', 'amount', 'date',
+        'days', 'notes', 'paid', 'pays', 'created', 'img', 'updatedAt'
+      ];
+      return hasRequiredFields(data, required)
+          && hasOnlyAllowedFields(data, allowed)
+          && validStringLength(data.id, 1, 64)
+          && data.id == billId
+          && validStringLength(data.supplier, 1, 200)
+          && validStringLength(data.no, 0, 100)
+          && data.amount is number && data.amount > 0 && data.amount <= 100000000
+          && isValidIsoDate(data.date)
+          && isValidNumberRange(data.days, 0, 3650)
+          && validStringLength(data.notes, 0, 500)
+          && isValidNumberRange(data.paid, 0, 100000000)
+          && isValidList(data.pays, 200)
+          && isValidOptionalIsoDate(data, 'created')
+          && isValidOptionalString(data, 'img', 0, 250000)
+          && data.updatedAt is number && data.updatedAt > 0;
+    }
+
+    function isValidSettings(data) {
+      let fields = ['defDays', 'updatedAt'];
+      return hasRequiredFields(data, fields)
+          && hasOnlyAllowedFields(data, fields)
+          && isValidNumberRange(data.defDays, 0, 3650)
+          && data.updatedAt is number && data.updatedAt > 0;
+    }
+
+    // ===============================================================
+    // Collection Rules
+    // ===============================================================
+
+    match /bills/{billId} {
+      allow read: if true;
+      allow create, update: if isValidBill(request.resource.data, billId);
+      allow delete: if true;
+    }
+
+    match /app_meta/{docId} {
+      allow read: if true;
+      allow create, update: if docId == 'settings'
+                            && isValidSettings(request.resource.data);
+      allow delete: if docId == 'settings';
+    }
+
+    // Explicit default deny for all other collections and subcollections
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
