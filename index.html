@@ -79,6 +79,9 @@ h2{margin:0;font-size:1.02rem;letter-spacing:-.01em}
 .kpi span{font-size:.8rem;color:var(--mute)}
 .kpi b{display:block;font-size:1.25rem;letter-spacing:-.02em;font-variant-numeric:tabular-nums;line-height:1.2}
 .kpi em{font-style:normal;font-size:.76rem;color:var(--mute)}
+.seg{display:inline-flex;padding:3px;border-radius:99px;background:var(--surface);border:1px solid var(--line);box-shadow:0 1px 2px rgba(15,23,42,.04);flex-shrink:0}
+.seg button{min-height:36px;padding:4px 13px;border-radius:99px;font-size:.82rem;font-weight:650;color:var(--mute);transition:all .15s;white-space:nowrap}
+.seg button.on{background:var(--brand);color:var(--on-brand);box-shadow:0 2px 6px color-mix(in srgb,var(--brand) 28%,transparent)}
 /* list rows */
 .row{display:flex;align-items:center;gap:12px;padding:12px 0;border-top:1px solid var(--line);text-align:left;width:100%}
 .row:first-of-type{border-top:0}
@@ -278,9 +281,18 @@ td:not(:first-child),th:not(:first-child){text-align:right;font-variant-numeric:
         </div>
       </div>
 
-      <div class="kpis">
-        <div class="kpi"><div class="chip-ic c-blue"><svg class="i"><use href="#i-cart"/></svg></div><span>Total purchases</span><b id="sBuy">₹0</b><em id="sBuyM">This month ₹0</em></div>
-        <div class="kpi"><div class="chip-ic c-green"><svg class="i"><use href="#i-card"/></svg></div><span>Payments made</span><b id="sPaid">₹0</b><em id="sPaidM">This month ₹0</em></div>
+      <div>
+        <div class="sec" style="margin-bottom:8px">
+          <h2 id="kpiTitle">This month</h2>
+          <div class="seg" role="group" aria-label="Purchase and payment period">
+            <button type="button" id="kpiMon" class="on" data-kmode="m" aria-pressed="true">Month</button>
+            <button type="button" id="kpiFy" data-kmode="fy" aria-pressed="false">Fin. Year</button>
+          </div>
+        </div>
+        <div class="kpis">
+          <div class="kpi"><div class="chip-ic c-blue"><svg class="i"><use href="#i-cart"/></svg></div><span>Total purchases</span><b id="sBuy">₹0</b><em id="sBuyM">This month</em></div>
+          <div class="kpi"><div class="chip-ic c-green"><svg class="i"><use href="#i-card"/></svg></div><span>Payments made</span><b id="sPaid">₹0</b><em id="sPaidM">This month</em></div>
+        </div>
       </div>
 
       <div class="card">
@@ -571,7 +583,7 @@ function payEvents(b){
   return ev;
 }
 function toast(m){const t=$('toast');t.textContent=m;t.classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>t.classList.remove('show'),2200)}
-let showAll=false,listF='pending',srchF='pending',payPhotoData='',entryPhotoData='',listPhotos={};
+let showAll=false,homeKpi='m',listF='pending',srchF='pending',payPhotoData='',entryPhotoData='',listPhotos={};
 const kb=d=>Math.max(1,Math.round(d.length*0.75/1024))+' KB';
 function compressPhoto(file){
   return new Promise((res,rej)=>{
@@ -609,24 +621,29 @@ function supplierBoxes(onlyPend,q){
 }
 function chips(el,items,cur,attr){el.innerHTML=items.map(([k,l])=>`<button type="button" ${attr}="${k}" class="${k===cur?'on':''}">${l}</button>`).join('')}
 function render(){
-  const ym=iso(new Date()).slice(0,7);
-  let buy=0,buyM=0,paid=0,paidM=0,pend=0,due=0,over=0,nOver=0;
+  const nowD=new Date(),ym=iso(nowD).slice(0,7),fyY=nowD.getMonth()+1>=4?nowD.getFullYear():nowD.getFullYear()-1;
+  const fyStart=fyY+'-04-01',fyEnd=(fyY+1)+'-03-31',fyLbl='FY '+fyY+'–'+String(fyY+1).slice(-2);
+  let buy=0,buyM=0,buyFY=0,paid=0,paidM=0,paidFY=0,pend=0,due=0,over=0,nOver=0;
   const acts=[],attn=[];
   S.bills.forEach((b,n)=>{
-    const i=info(b);buy+=b.amount;if(b.date.slice(0,7)===ym)buyM+=b.amount;
+    const i=info(b),bd=b.date||'';buy+=b.amount;if(bd.slice(0,7)===ym)buyM+=b.amount;if(bd>=fyStart&&bd<=fyEnd)buyFY+=b.amount;
     if(i.bal>0){pend+=i.bal;due++;if(i.st==='overdue'){over+=i.bal;nOver++}if(i.st==='overdue'||i.st==='soon')attn.push({b,i})}
     acts.push({d:b.created||b.date,seq:n*2,k:'buy',t:b.supplier,sub:'Purchase'+(b.no?' · Bill '+b.no:''),a:b.amount,s:i.bal<=0?'Paid':'Pending',bid:b.id,img:b.img||''});
-    payEvents(b).forEach((p,k)=>{paid+=p.a;if(p.d.slice(0,7)===ym)paidM+=p.a;acts.push({d:p.d,seq:n*2+1+k/100,k:'pay',t:b.supplier,sub:'Payment'+(b.no?' · Bill '+b.no:'')+(p.r?' · RT/Rcpt '+p.r:''),a:p.a,s:'Paid',bid:b.id,pidx:p.idx,img:p.img})});
+    payEvents(b).forEach((p,k)=>{const pd=p.d||'';paid+=p.a;if(pd.slice(0,7)===ym)paidM+=p.a;if(pd>=fyStart&&pd<=fyEnd)paidFY+=p.a;acts.push({d:p.d,seq:n*2+1+k/100,k:'pay',t:b.supplier,sub:'Payment'+(b.no?' · Bill '+b.no:'')+(p.r?' · RT/Rcpt '+p.r:''),a:p.a,s:'Paid',bid:b.id,pidx:p.idx,img:p.img})});
   });
-  const h=new Date().getHours();
+  const h=nowD.getHours();
   $('greet').textContent=(h<12?'Good morning':h<17?'Good afternoon':'Good evening');
-  $('hDate').textContent=new Date().toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  $('hDate').textContent=nowD.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
   $('sPend').textContent=inr(pend);
   $('sDue').textContent=due?due+' open bill'+(due>1?'s':'')+(over>0?' · '+inr(over)+' overdue':''):'All bills are settled';
   const pct=buy>0?Math.min(100,Math.round(paid/buy*100)):0;
   $('progBar').style.width=pct+'%';$('progL').textContent='Paid '+inr(paid)+' of '+inr(buy);$('progP').textContent=pct+'%';
-  $('sBuy').textContent=inr(buy);$('sBuyM').textContent='This month '+inr(buyM);
-  $('sPaid').textContent=inr(paid);$('sPaidM').textContent='This month '+inr(paidM);
+  const isFy=homeKpi==='fy',mName=nowD.toLocaleDateString('en-GB',{month:'short',year:'numeric'}),fySub='Apr '+fyY+' – Mar '+(fyY+1);
+  $('kpiTitle').textContent=isFy?fyLbl:mName;
+  $('kpiMon').classList.toggle('on',!isFy);$('kpiFy').classList.toggle('on',isFy);
+  $('kpiMon').setAttribute('aria-pressed',isFy?'false':'true');$('kpiFy').setAttribute('aria-pressed',isFy?'true':'false');
+  $('sBuy').textContent=inr(isFy?buyFY:buyM);$('sBuyM').textContent=isFy?fySub:'This month';
+  $('sPaid').textContent=inr(isFy?paidFY:paidM);$('sPaidM').textContent=isFy?fySub:'This month';
   attn.sort((a,c)=>a.i.due-c.i.due);
   $('attn').innerHTML=attn.length?attn.slice(0,4).map(({b,i})=>`<button class="row" type="button" data-go="list"><span class="dot d-${i.st}"></span><span class="tx"><b>${esc(b.supplier)}</b><span>Bill ${esc(b.no||'–')} · ${dueText(i)}</span></span><span class="amt">${inr(i.bal)}</span></button>`).join(''):empty('check','You are all caught up. Nothing is overdue or due this week.');
   acts.sort((x,y)=>y.d<x.d?-1:y.d>x.d?1:y.seq-x.seq);
@@ -767,6 +784,7 @@ document.addEventListener('click',e=>{
   if(g){const v=g.dataset.go;if(v==='list'&&g.closest('#v-home'))listF=g.classList.contains('row')?'overdue':'pending';location.hash=v==='home'?'':v;return}
   const f=e.target.closest('[data-f]');if(f){listF=f.dataset.f;render();return}
   const sf=e.target.closest('[data-sf]');if(sf){srchF=sf.dataset.sf;render();return}
+  const km=e.target.closest('[data-kmode]');if(km){homeKpi=km.dataset.kmode;render();return}
   const d=e.target.closest('[data-d]');if(d){$('days').value=d.dataset.d;dueUpd()}
 });
 /* entry */
@@ -1024,7 +1042,7 @@ $('doReset').onclick=()=>{
   try{localStorage.removeItem(KEY)}catch(e){}
   S={bills:[],budget:1000,defDays:90,defDaysAt:Date.now(),seeded:true,dirty:{},dels:{}};
   prevIds.forEach(id=>{S.dels[id]=true});save();
-  showAll=false;listF='pending';srchF='pending';pinTries=0;pinLockUntil=0;listPhotos={};
+  showAll=false;homeKpi='m';listF='pending';srchF='pending';pinTries=0;pinLockUntil=0;listPhotos={};
   clearEntryPhoto();clearPayPhoto();$('payAmt').value='';$('payRt').value='';$('q').value='';$('sq').value='';
   $('days').value=S.defDays;$('date').value=iso(new Date());['supplier','no','amount','notes'].forEach(k=>$(k).value='');$('rst').value='';
   modal(0);render();dueUpd();toast('All data cleared');
