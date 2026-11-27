@@ -163,9 +163,10 @@ input[type=file]::file-selector-button{margin-right:12px;border:0;border-radius:
 .invrow{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:.82rem;padding-top:6px;border-top:1px dashed var(--line)}.invrow:first-of-type{border-top:0;padding-top:0}
 .pthumb{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:99px;background:var(--blue-t);color:var(--blue);font-size:.74rem;font-weight:650;vertical-align:middle}
 .expgrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}.expgrid .btn{font-size:.84rem;padding:10px 8px;text-align:center;line-height:1.25}
-#modal,#imgModal,#impModal{position:fixed;inset:0;z-index:100;display:grid;place-items:center;padding:20px;background:rgba(10,17,29,.62);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)}
+#modal,#imgModal,#impModal,#editModal{position:fixed;inset:0;z-index:100;display:grid;place-items:center;padding:20px;background:rgba(10,17,29,.62);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)}
 #modal{z-index:120}
 #imgModal{z-index:110;padding:16px}
+#editModal{z-index:108;padding:16px}
 #impModal{z-index:105;padding:14px}
 .mbox,.imbox,.impbox{width:100%;max-width:380px;background:var(--surface);border:1px solid var(--line);border-radius:22px;padding:20px;box-shadow:0 24px 60px rgba(0,0,0,.35);animation:in .2s ease both}
 .imbox{max-width:520px;padding:16px;display:grid;gap:12px}
@@ -509,12 +510,12 @@ td:not(:first-child),th:not(:first-child){text-align:right;font-variant-numeric:
         <button class="icon-btn" type="button" data-impclose aria-label="Close"><svg class="i"><use href="#i-x"/></svg></button>
       </div>
       <div id="impSheetRow" hidden><label>Sheet<select id="impSheet"></select></label></div>
-      <div id="impSupRow" hidden><label>Supplier name (for rows without supplier column)<input id="impDefSup" placeholder="e.g. MAJESTIC DRUGS"></label></div>
+      <div id="impSupRow" hidden><label>Supplier name (for rows without supplier column)<input id="impDefSup" list="impSupList" placeholder="e.g. MAJESTIC DRUGS"></label><datalist id="impSupList"></datalist><div class="chips wrap" id="impSupHint" hidden style="margin-top:6px"></div></div>
       <div class="meta" id="impSum" style="padding:8px 10px;border-radius:10px;background:var(--soft);color:var(--ink);font-weight:600"></div>
       <div class="scroll" style="max-height:210px;overflow:auto;border:1px solid var(--line);border-radius:12px;padding:0 6px">
         <table><thead><tr><th>Supplier</th><th>Inv no.</th><th>Date</th><th>Amount</th><th>Paid</th></tr></thead><tbody id="impPrevBody"></tbody></table>
       </div>
-      <label style="display:flex;align-items:center;gap:10px;font-size:.86rem;color:var(--ink);cursor:pointer"><input id="impSkipDup" type="checkbox" checked style="width:20px;height:20px;min-height:20px;flex:none"><span>Skip duplicate bills already saved</span></label>
+      <label style="display:flex;align-items:center;gap:10px;font-size:.86rem;color:var(--ink);cursor:pointer"><input id="impSkipDup" type="checkbox" checked style="width:20px;height:20px;min-height:20px;flex:none"><span>Skip duplicates &amp; add missing invoice no. to saved bills</span></label>
       <details id="impMapBox" class="impdet">
         <summary><span>Adjust columns / header row</span><span class="meta" id="impMapHint"></span></summary>
         <label style="margin-bottom:8px">Header row<select id="impHdr"></select></label>
@@ -532,6 +533,21 @@ td:not(:first-child),th:not(:first-child){text-align:right;font-variant-numeric:
       <div class="acts">
         <button class="btn ghost sm" type="button" data-impclose>Cancel</button>
         <button class="btn sm" id="impDoBtn" type="button">Import</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="editModal" hidden>
+    <div class="mbox" style="max-width:420px;display:grid;gap:12px" role="dialog" aria-modal="true" aria-labelledby="editTitle">
+      <div class="sec" style="margin:0">
+        <div style="min-width:0"><h2 id="editTitle">Update bill details</h2><div class="meta" id="editMeta"></div></div>
+        <button class="icon-btn" type="button" data-eclose aria-label="Close"><svg class="i"><use href="#i-x"/></svg></button>
+      </div>
+      <label>Invoice / Bill number<input id="editNo" placeholder="e.g. INV-101"></label>
+      <label>Note<input id="editNotes" placeholder="Optional · details to identify the bill"></label>
+      <div class="acts">
+        <button class="btn ghost sm" type="button" data-eclose>Cancel</button>
+        <button class="btn sm" id="editSave" type="button">Save invoice</button>
       </div>
     </div>
   </div>
@@ -631,7 +647,7 @@ function supplierBoxes(onlyPend,q){
   if(!keys.length)return `<div class="card">${empty('inbox','No matching bills')}</div>`;
   return keys.map(k=>{const g=groups[k];
     return `<div class="sbox"><div class="shead"><div class="av">${esc(k.trim().charAt(0).toUpperCase()||'?')}</div><div class="tx"><b>${esc(k)}</b><span class="meta">${g.bills.length} bill${g.bills.length>1?'s':''} · billed ${inr(g.amt)} · <button type="button" class="link" data-rensup="${esc(k)}" style="min-height:0;padding:0;font-size:.8rem">Rename</button></span></div><div class="amt">${inr(g.pend)}<small>pending</small></div></div>`+
-    g.bills.sort((x,y)=>x.i.due-y.i.due).map(({b,i})=>`<div class="sline"><span class="no">Bill ${esc(b.no||'–')} <span class="meta">· ${fmt(b.date)}</span>${b.img?` <button type="button" class="pthumb" data-bimg="${b.id}"><svg class="i"><use href="#i-cam"/></svg>Photo</button>`:''}</span><span class="amt">${inr(b.amount)}${i.bal<=0?' <span class="tag paid">Paid</span>':(b.paid>0?'<small>bal '+inr(i.bal)+'</small>':'')}</span></div>`).join('')+`</div>`}).join('');
+    g.bills.sort((x,y)=>x.i.due-y.i.due).map(({b,i})=>`<div class="sline"><span class="no">${b.no?'Inv <b>'+esc(b.no)+'</b>':'No inv no.'} <span class="meta">· ${fmt(b.date)}</span>${b.img?` <button type="button" class="pthumb" data-bimg="${b.id}"><svg class="i"><use href="#i-cam"/></svg>Photo</button>`:''}</span><span class="amt">${inr(b.amount)}${i.bal<=0?' <span class="tag paid">Paid</span>':(b.paid>0?'<small>bal '+inr(i.bal)+'</small>':'')}</span></div>`).join('')+`</div>`}).join('');
 }
 function chips(el,items,cur,attr){el.innerHTML=items.map(([k,l])=>`<button type="button" ${attr}="${k}" class="${k===cur?'on':''}">${l}</button>`).join('')}
 function render(){
@@ -642,8 +658,8 @@ function render(){
   S.bills.forEach((b,n)=>{
     const i=info(b),bd=b.date||'';buy+=b.amount;if(bd.slice(0,7)===ym)buyM+=b.amount;if(bd>=fyStart&&bd<=fyEnd)buyFY+=b.amount;
     if(i.bal>0){pend+=i.bal;due++;if(i.st==='overdue'){over+=i.bal;nOver++}if(i.st==='overdue'||i.st==='soon')attn.push({b,i})}
-    acts.push({d:b.created||b.date,seq:n*2,k:'buy',t:b.supplier,sub:'Purchase'+(b.no?' · Bill '+b.no:''),a:b.amount,s:i.bal<=0?'Paid':'Pending',bid:b.id,img:b.img||''});
-    payEvents(b).forEach((p,k)=>{const pd=p.d||'';paid+=p.a;if(pd.slice(0,7)===ym)paidM+=p.a;if(pd>=fyStart&&pd<=fyEnd)paidFY+=p.a;acts.push({d:p.d,seq:n*2+1+k/100,k:'pay',t:b.supplier,sub:'Payment'+(b.no?' · Bill '+b.no:'')+(p.r?' · RT/Rcpt '+p.r:''),a:p.a,s:'Paid',bid:b.id,pidx:p.idx,img:p.img})});
+    acts.push({d:b.created||b.date,seq:n*2,k:'buy',t:b.supplier,sub:'Purchase'+(b.no?' · Inv '+b.no:''),a:b.amount,s:i.bal<=0?'Paid':'Pending',bid:b.id,img:b.img||''});
+    payEvents(b).forEach((p,k)=>{const pd=p.d||'';paid+=p.a;if(pd.slice(0,7)===ym)paidM+=p.a;if(pd>=fyStart&&pd<=fyEnd)paidFY+=p.a;acts.push({d:p.d,seq:n*2+1+k/100,k:'pay',t:b.supplier,sub:'Payment'+(b.no?' · Inv '+b.no:'')+(p.r?' · RT/Rcpt '+p.r:''),a:p.a,s:'Paid',bid:b.id,pidx:p.idx,img:p.img})});
   });
   const h=nowD.getHours();
   $('greet').textContent=(h<12?'Good morning':h<17?'Good afternoon':'Good evening');
@@ -659,7 +675,7 @@ function render(){
   $('sBuy').textContent=inr(isFy?buyFY:buyM);$('sBuyM').textContent=isFy?fySub:'This month';
   $('sPaid').textContent=inr(isFy?paidFY:paidM);$('sPaidM').textContent=isFy?fySub:'This month';
   attn.sort((a,c)=>a.i.due-c.i.due);
-  $('attn').innerHTML=attn.length?attn.slice(0,4).map(({b,i})=>`<button class="row" type="button" data-go="list"><span class="dot d-${i.st}"></span><span class="tx"><b>${esc(b.supplier)}</b><span>Bill ${esc(b.no||'–')} · ${dueText(i)}</span></span><span class="amt">${inr(i.bal)}</span></button>`).join(''):empty('check','You are all caught up. Nothing is overdue or due this week.');
+  $('attn').innerHTML=attn.length?attn.slice(0,4).map(({b,i})=>`<button class="row" type="button" data-go="list"><span class="dot d-${i.st}"></span><span class="tx"><b>${esc(b.supplier)}</b><span>${b.no?'Inv '+esc(b.no):'No inv no.'} · ${dueText(i)}</span></span><span class="amt">${inr(i.bal)}</span></button>`).join(''):empty('check','You are all caught up. Nothing is overdue or due this week.');
   acts.sort((x,y)=>y.d<x.d?-1:y.d>x.d?1:y.seq-x.seq);
   const todayS=iso(new Date());
   const todays=acts.filter(a=>a.d===todayS);
@@ -712,13 +728,13 @@ function render(){
       const pc=Math.min(100,Math.round((b.paid||0)/b.amount*100));
       const closedOn=i.bal<=0?(b.pays.length?b.pays[b.pays.length-1].d:b.date):'';
       const tagLbl=i.st==='paid'?'Closed':dueText(i);
-      return `<div class="bcard ${i.st}"><div class="btop"><div><b>${esc(b.supplier)}</b><div class="meta">Bill ${esc(b.no||'–')} · dated ${fmt(b.date)}</div></div><span class="tag ${i.st}">${tagLbl}</span></div>
+      return `<div class="bcard ${i.st}"><div class="btop"><div><b>${esc(b.supplier)}</b><div class="meta">${b.no?'Invoice <b style="color:var(--ink)">'+esc(b.no)+'</b>':'<span style="color:var(--amber)">No invoice no.</span>'} · dated ${fmt(b.date)}</div></div><span class="tag ${i.st}">${tagLbl}</span></div>
       <div class="bar"><i style="width:${pc}%"></i></div>
       <div class="bnums"><span>Amount <b>${inr(b.amount)}</b></span><span>Paid <b>${inr(b.paid||0)}</b></span><span>Balance <b>${inr(i.bal)}</b></span></div>
       <div class="meta">${closedOn?'Closed on '+fmt(closedOn)+' · due was '+fmt(iso(i.due)):'Due '+fmt(iso(i.due))}${b.notes?' · '+esc(b.notes):''}${b.img?` <button type="button" class="pthumb" data-bimg="${b.id}"><svg class="i"><use href="#i-cam"/></svg>Bill photo</button>`:''}</div>
-      ${b.pays.length?'<div class="phist">'+b.pays.map((p,idx)=>`<div class="pl"><span>${fmtShort(p.d)}${p.r?' · RT/Rcpt <b>'+esc(p.r)+'</b>':''}${p.img?` <button type="button" class="pthumb" data-img="${b.id}|${idx}"><svg class="i"><use href="#i-cam"/></svg>Photo</button>`:''}</span><span>${inr(p.a)}</span></div>`).join('')+'</div>':(i.bal<=0?`<div class="phist"><div class="pl"><span>Settled in full</span><span>${inr(b.paid||b.amount)}</span></div></div>`:'')}
+      ${b.pays.length?'<div class="phist">'+b.pays.map((p,idx)=>`<div class="pl"><span>${fmtShort(p.d)}${b.no?' · Inv <b>'+esc(b.no)+'</b>':''}${p.r?' · RT/Rcpt <b>'+esc(p.r)+'</b>':''}${p.img?` <button type="button" class="pthumb" data-img="${b.id}|${idx}"><svg class="i"><use href="#i-cam"/></svg>Photo</button>`:''}</span><span>${inr(p.a)}</span></div>`).join('')+'</div>':(i.bal<=0?`<div class="phist"><div class="pl"><span>Settled in full</span><span>${inr(b.paid||b.amount)}</span></div></div>`:'')}
       ${i.bal>0?`<div class="payform"><span class="money"><input type="number" min="0" step="0.01" inputmode="decimal" placeholder="Amount" id="p-${b.id}"></span><input id="r-${b.id}" placeholder="RT / Receipt no."><label class="pbtn sm${listPhotos[b.id]?' has':''}" id="plbl-${b.id}"><input type="file" accept="image/*" data-limg="${b.id}"><svg class="i"><use href="#i-cam"/></svg><span>${listPhotos[b.id]?'Photo ('+kb(listPhotos[b.id])+')':'Photo'}</span></label><button class="btn sm" type="button" data-pay="${b.id}">Record payment</button></div>`:''}
-      <div class="acts"><button class="btn bad sm" type="button" data-del="${b.id}">Delete</button></div></div>`}).join(''):`<div class="card">${empty(f==='closed'?'check':'inbox',f==='closed'?'No closed bills yet.':'Nothing to show here.')}</div>`;
+      <div class="acts"><button class="btn ghost sm" type="button" data-edit="${b.id}">${b.no?'Edit inv':'Add invoice'}</button><button class="btn bad sm" type="button" data-del="${b.id}">Delete</button></div></div>`}).join(''):`<div class="card">${empty(f==='closed'?'check':'inbox',f==='closed'?'No closed bills yet.':'Nothing to show here.')}</div>`;
   }
   // search
   chips($('schips'),[['pending','Pending only'],['all','All bills']],srchF,'data-sf');
@@ -759,8 +775,8 @@ function render(){
     S.bills.forEach(b=>payEvents(b).forEach(p=>{if(p.d===curDate)dayP.push({b,p})}));
     $('rDayH').textContent='Activity · '+fmt(curDate);
     $('rDayMeta').textContent=dayB.length+' bill'+(dayB.length===1?'':'s')+' · '+dayP.length+' paid';
-    $('rDayList').innerHTML=(dayB.map(b=>{const i=info(b);return `<div class="ditem"><div style="min-width:0"><b>${esc(b.supplier)}</b> <span class="tag ${i.st}">${i.st==='paid'?'Paid':'Bill'}</span><div class="meta">Bill ${esc(b.no||'–')} · ${dueText(i)}${b.img?` <button type="button" class="pthumb" data-bimg="${b.id}"><svg class="i"><use href="#i-cam"/></svg>Photo</button>`:''}</div></div><div style="text-align:right;white-space:nowrap"><b>${inr(b.amount)}</b>${i.bal>0&&b.paid>0?`<div class="meta">bal ${inr(i.bal)}</div>`:''}</div></div>`}).join('')+
-      dayP.map(({b,p})=>`<div class="ditem"><div style="min-width:0"><b>${esc(b.supplier)}</b> <span class="tag paid">Paid</span><div class="meta">Bill ${esc(b.no||'–')}${p.r?' · RT '+esc(p.r):''}${p.img&&p.idx>=0?` <button type="button" class="pthumb" data-img="${b.id}|${p.idx}"><svg class="i"><use href="#i-cam"/></svg>Photo</button>`:''}</div></div><div style="text-align:right;white-space:nowrap"><b style="color:var(--green)">+${inr(p.a)}</b></div></div>`).join(''))||`<div class="meta">No bills or payments on ${fmt(curDate)}.</div>`;
+    $('rDayList').innerHTML=(dayB.map(b=>{const i=info(b);return `<div class="ditem"><div style="min-width:0"><b>${esc(b.supplier)}</b> <span class="tag ${i.st}">${i.st==='paid'?'Paid':'Bill'}</span><div class="meta">${b.no?'Inv <b>'+esc(b.no)+'</b>':'No inv no.'} · ${dueText(i)}${b.img?` <button type="button" class="pthumb" data-bimg="${b.id}"><svg class="i"><use href="#i-cam"/></svg>Photo</button>`:''}</div></div><div style="text-align:right;white-space:nowrap"><b>${inr(b.amount)}</b>${i.bal>0&&b.paid>0?`<div class="meta">bal ${inr(i.bal)}</div>`:''}</div></div>`}).join('')+
+      dayP.map(({b,p})=>`<div class="ditem"><div style="min-width:0"><b>${esc(b.supplier)}</b> <span class="tag paid">Paid</span><div class="meta">${b.no?'Inv <b>'+esc(b.no)+'</b>':'No inv no.'}${p.r?' · RT '+esc(p.r):''}${p.img&&p.idx>=0?` <button type="button" class="pthumb" data-img="${b.id}|${p.idx}"><svg class="i"><use href="#i-cam"/></svg>Photo</button>`:''}</div></div><div style="text-align:right;white-space:nowrap"><b style="color:var(--green)">+${inr(p.a)}</b></div></div>`).join(''))||`<div class="meta">No bills or payments on ${fmt(curDate)}.</div>`;
   }else $('rDayList').innerHTML='';
   if(dOn){
     const days=repDates(curMon),dk=Object.keys(days).sort().reverse();
@@ -776,6 +792,7 @@ function route(){
   if(!$('modal').hidden)modal(0);
   if(!$('imgModal').hidden)closeImg();
   if(!$('impModal').hidden)closeImp();
+  if(!$('editModal').hidden)closeEdit();
   hideSupDrop();
   const v=location.hash.slice(1);const name=TITLES[v]?v:'home';
   document.querySelectorAll('.view').forEach(s=>{s.hidden=s.id!=='v-'+name});
@@ -788,8 +805,10 @@ window.addEventListener('hashchange',route);
 document.addEventListener('click',e=>{
   const bim=e.target.closest('[data-bimg]');
   if(bim){const b=S.bills.find(x=>x.id===bim.dataset.bimg);
-    if(b&&b.img)openImg(b.img,b.supplier+(b.no?' · Bill '+b.no:''),fmt(b.date)+' · '+inr(b.amount)+(b.notes?' · '+b.notes:''),'inhaero-bill-'+(b.no||b.date)+'.jpg');
+    if(b&&b.img)openImg(b.img,b.supplier+(b.no?' · Inv '+b.no:''),fmt(b.date)+' · '+inr(b.amount)+(b.notes?' · '+b.notes:''),'inhaero-bill-'+(b.no||b.date)+'.jpg');
     return}
+  const ed=e.target.closest('[data-edit]');
+  if(ed){const b=S.bills.find(x=>x.id===ed.dataset.edit);if(b)openEdit(b);return}
   const im=e.target.closest('[data-img]');
   if(im){const[bid,idx]=im.dataset.img.split('|'),b=S.bills.find(x=>x.id===bid),p=b&&b.pays[Number(idx)];
     if(p&&p.img)openImg(p.img,b.supplier+(b.no?' · Bill '+b.no:''),fmt(p.d)+' · '+inr(p.a)+(p.r?' · RT/Rcpt '+p.r:''),'inhaero-receipt-'+(p.r||b.no||p.d)+'.jpg');
@@ -886,22 +905,22 @@ function updPayHint(){
   const sup=$('paySup').value,bid=$('payBill').value,open=openSupBills(sup),m=getPayMax();
   if(!(m>0)){$('payBalHint').textContent='';$('payInvWrap').hidden=true;$('payInvBox').innerHTML='';return}
   const f=bid==='__all'?null:open.find(x=>x.b.id===bid);
-  $('payBalHint').textContent=(f?(f.b.no?'Bill '+f.b.no:fmtShort(f.b.date)):'All '+open.length+' bills')+' · Bal '+inr(m);
+  $('payBalHint').textContent=(f?(f.b.no?'Inv '+f.b.no:fmtShort(f.b.date)):'All '+open.length+' bills')+' · Bal '+inr(m);
   $('payInvWrap').hidden=false;
   if(f){
     const b=f.b,i=f.i;
     $('payInvBox').innerHTML=(b.img?`<img src="${b.img}" alt="Purchase invoice" data-bimg="${b.id}">`:`<div class="ic"><svg class="i"><use href="#i-card"/></svg></div>`)+
-      `<div class="tx"><b>${b.no?'Invoice '+esc(b.no):'No invoice no.'} · ${fmt(b.date)}</b><div class="meta">Bill ${inr(b.amount)}${b.paid>0?' · Paid '+inr(b.paid):''} · Bal <b style="display:inline;color:var(--ink)">${inr(i.bal)}</b></div>${b.notes?`<div class="meta" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(b.notes)}</div>`:''}</div>`+
+      `<div class="tx"><b>${b.no?'Invoice '+esc(b.no):'No invoice no.'} · ${fmt(b.date)}</b><div class="meta">Bill ${inr(b.amount)}${b.paid>0?' · Paid '+inr(b.paid):''} · Bal <b style="display:inline;color:var(--ink)">${inr(i.bal)}</b> · <button type="button" class="link" data-edit="${b.id}" style="min-height:0;padding:0;font-size:.78rem">${b.no?'Edit inv':'+ Add inv'}</button></div>${b.notes?`<div class="meta" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(b.notes)}</div>`:''}</div>`+
       (b.img?`<button type="button" class="btn ghost sm" data-bimg="${b.id}" style="flex-shrink:0"><svg class="i"><use href="#i-cam"/></svg>View</button>`:`<span class="tag ${i.st}" style="flex-shrink:0">${dueText(i)}</span>`);
   }else{
-    $('payInvBox').innerHTML='<div class="invlist">'+open.slice(0,4).map(({b,i})=>`<div class="invrow"><span><b>${b.no?'Inv '+esc(b.no):'No no.'}</b> · ${fmtShort(b.date)}${b.img?` <button type="button" class="pthumb" data-bimg="${b.id}"><svg class="i"><use href="#i-cam"/></svg>Invoice</button>`:''}</span><span>${inr(i.bal)}</span></div>`).join('')+(open.length>4?`<div class="meta">+ ${open.length-4} more open bills</div>`:'')+'</div>';
+    $('payInvBox').innerHTML='<div class="invlist">'+open.slice(0,4).map(({b,i})=>`<div class="invrow"><span><b>${b.no?'Inv '+esc(b.no):'No inv no.'}</b> · ${fmtShort(b.date)}${b.img?` <button type="button" class="pthumb" data-bimg="${b.id}"><svg class="i"><use href="#i-cam"/></svg>Invoice</button>`:''}</span><span>${inr(i.bal)}</span></div>`).join('')+(open.length>4?`<div class="meta">+ ${open.length-4} more open bills</div>`:'')+'</div>';
   }
 }
 function fillPayBills(supMap){
   const sup=$('paySup').value;
   const list=supMap?supMap[sup].bills:openSupBills(sup);
   const prev=$('payBill').value;
-  let opts=list.map(({b,i})=>`<option value="${esc(b.id)}">${b.no?'Bill '+esc(b.no):'No bill no.'} · ${fmtShort(b.date)} (Bal ${inr(i.bal)})</option>`).join('');
+  let opts=list.map(({b,i})=>`<option value="${esc(b.id)}">${b.no?'Inv '+esc(b.no):'No inv no.'} · ${fmtShort(b.date)} (Bal ${inr(i.bal)})</option>`).join('');
   if(list.length>1){const tot=list.reduce((s,x)=>s+x.i.bal,0);opts+=`<option value="__all">All ${list.length} open bills · oldest first (${inr(tot)})</option>`}
   $('payBill').innerHTML=opts;
   $('payBill').value=(prev==='__all'&&list.length>1)||list.some(x=>x.b.id===prev)?prev:(list[0]?list[0].b.id:'');
@@ -927,8 +946,8 @@ $('paySubmit').onclick=()=>{
   let billDesc='';
   if(bid==='__all'){
     const cov=[];let remC=amt;
-    for(const x of openSupBills(sup)){if(remC<=0.005)break;cov.push(x.b.no||'#'+fmtShort(x.b.date));remC-=x.i.bal}
-    billDesc='Bills '+cov.slice(0,3).join(', ')+(cov.length>3?' +'+(cov.length-3)+' more':'');
+    for(const x of openSupBills(sup)){if(remC<=0.005)break;cov.push(x.b.no?'Inv '+x.b.no:fmtShort(x.b.date));remC-=x.i.bal}
+    billDesc=(cov.some(x=>x.startsWith('Inv '))?'Invoices ':'Bills ')+cov.slice(0,3).join(', ')+(cov.length>3?' +'+(cov.length-3)+' more':'');
   }else{
     billDesc=oneB.no?'Invoice '+oneB.no+' ('+fmtShort(oneB.date)+' · '+inr(oneB.amount)+')':fmtShort(oneB.date)+' ('+inr(oneB.amount)+')';
   }
@@ -1066,8 +1085,28 @@ function modal(step,cfg){$('modal').hidden=step===0;$('mStep1').hidden=step!==1;
   syncLock()}
 function askCode(title,sub,hash,fn,btn){modal(1,{title,sub,btn:btn||'Confirm',hash,fn})}
 function askSaveLock(title,sub,fn){askCode(title,sub,SAVE_HASH,fn,'Confirm')}
-function syncLock(){document.body.style.overflow=($('modal').hidden&&$('imgModal').hidden&&$('impModal').hidden)?'':'hidden'}
+function syncLock(){document.body.style.overflow=($('modal').hidden&&$('imgModal').hidden&&$('impModal').hidden&&$('editModal').hidden)?'':'hidden'}
 $('resetBtn').onclick=()=>modal(1);
+let editBid='';
+function openEdit(b){
+  editBid=b.id;$('editMeta').textContent=b.supplier+' · '+fmt(b.date)+' · '+inr(b.amount);
+  $('editNo').value=b.no||'';$('editNotes').value=b.notes||'';
+  $('editModal').hidden=false;syncLock();setTimeout(()=>$('editNo').focus(),50);
+}
+function closeEdit(){$('editModal').hidden=true;editBid='';syncLock()}
+$('editModal').addEventListener('click',e=>{if(e.target===$('editModal')||e.target.closest('[data-eclose]'))closeEdit()});
+['editNo','editNotes'].forEach(id=>$(id).addEventListener('keydown',e=>{if(e.key==='Enter')$('editSave').click()}));
+$('editSave').onclick=()=>{
+  const b=S.bills.find(x=>x.id===editBid);if(!b)return;
+  const no=$('editNo').value.trim().slice(0,100),notes=$('editNotes').value.trim().slice(0,500);
+  if(no===(b.no||'')&&notes===(b.notes||'')){closeEdit();return}
+  askSaveLock('Confirm bill update',b.supplier+(no?' · Invoice '+no:' · Clear invoice no.')+' · '+inr(b.amount)+' — enter passcode to save.',()=>{
+    const prevNo=b.no,prevNotes=b.notes,prevAt=b.updatedAt;
+    b.no=no;b.notes=notes;b.updatedAt=Date.now();S.dirty[b.id]=true;delete S.dels[b.id];
+    if(!save()){b.no=prevNo;b.notes=prevNotes;b.updatedAt=prevAt;delete S.dirty[b.id];toast('Storage full — backup or remove old photos');return}
+    closeEdit();render();toast(no?'Invoice '+no+' saved':'Bill details updated');window.fbPushBill?.(b);
+  });
+};
 let curImg={src:'',name:'receipt.jpg'};
 function openImg(src,title,meta,name){
   curImg={src,name:name||'receipt.jpg'};
@@ -1075,12 +1114,12 @@ function openImg(src,title,meta,name){
   $('imgModal').hidden=false;syncLock();
 }
 function closeImg(){$('imgModal').hidden=true;$('imgView').src='';syncLock()}
-function closeImp(){$('impModal').hidden=true;impSt.wb=null;impSt.rows=[];impSt.ready=[];syncLock()}
+function closeImp(){$('impModal').hidden=true;impSt.wb=null;impSt.rows=[];impSt.ready=[];$('impSupHint').hidden=true;syncLock()}
 $('imgModal').addEventListener('click',e=>{if(e.target===$('imgModal')||e.target.closest('[data-iclose]'))closeImg()});
 $('impModal').addEventListener('click',e=>{if(e.target===$('impModal')||e.target.closest('[data-impclose]'))closeImp()});
-$('imgDl').onclick=()=>{if(!curImg.src)return;const a=document.createElement('a');a.href=curImg.src;a.download=curImg.name;a.click()};
 $('modal').addEventListener('click',e=>{if(e.target===$('modal')||e.target.closest('[data-close]'))modal(0)});
-document.addEventListener('keydown',e=>{if(e.key==='Escape'){if(!$('modal').hidden)modal(0);else if(!$('imgModal').hidden)closeImg();else if(!$('impModal').hidden)closeImp()}});
+$('imgDl').onclick=()=>{if(!curImg.src)return;const a=document.createElement('a');a.href=curImg.src;a.download=curImg.name;a.click()};
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){if(!$('modal').hidden)modal(0);else if(!$('editModal').hidden)closeEdit();else if(!$('imgModal').hidden)closeImg();else if(!$('impModal').hidden)closeImp()}});
 async function tryPin(){
   const now=Date.now();
   if(now<pinLockUntil){$('pinErr').textContent='Too many attempts. Try again in '+Math.ceil((pinLockUntil-now)/1000)+'s.';$('pinErr').hidden=false;return}
@@ -1112,17 +1151,36 @@ $('rst').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileRea
 }}catch(x){toast('Could not read that file')}$('rst').value=''};r.readAsText(f)};
 var impSt={wb:null,rows:[],ready:[],name:''};
 const IMP_FIELDS=[
-  ['mapSup',h=>!/bill|inv|file|item|prod|drug/.test(h)?(/supplier|party|vendor|distrib|ledger|dealer|company|firm/.test(h)?2:(/\bname\b/.test(h)?1:0)):0],
+  ['mapSup',h=>!/bill|inv|file|item|prod|drug|vch|voucher|doc|ref|\bno\b|\bnum/.test(h)?(/supplier|party|vendor|distrib|ledger|dealer|company|firm/.test(h)?2:(/\bname\b/.test(h)?1:0)):0],
   ['mapAmt',h=>!/paid|pay|bal|pend|due|day|term|qty/.test(h)?(/\b(bill|net|inv|invoice|total|grand)?\s*(amt|amount)\b|\bgrand\s*total\b/.test(h)?2:(/\btotal\b|\bvalue\b|^credit$/.test(h)?1:0)):0],
   ['mapDate',h=>!/due|pay|rcpt|created|exp/.test(h)?(/\b(bill|inv|invoice|voucher|vch|purch\w*|entry)\s*(date|dt)\b|\b(date|dt)\s*(of\s*)?(purch\w*|bill|inv\w*)\b/.test(h)?2:(/\b(date|dt)\b/.test(h)?1:0)):0],
-  ['mapNo',h=>/\b(bill|inv|invoice|voucher|vch|ref)\s*(no|num|number|#)|^invoice$/.test(h)?2:(/^no$/.test(h)?1:0)],
+  ['mapNo',h=>{
+    if(/\b(date|dt|amt|amount|total|val|value|paid|pay|bal|balance|pend|pending|due|day|days|qty|rate|taxable|cgst|sgst|igst|disc|sl|sr|serial|gstin|phone|mob|mobile|hsn|batch|exp|mrp|type|status|mode|rcpt|receipt)\b|^s\s*no$/.test(h))return 0;
+    if(/\b(supplier|party|purch\w*|suppl\w*)\s*(inv|invoice|bill)\b|\b(inv|invoice|bill)\s*(no|num|number|#)\b|\b(invno|billno|invoiceno|supinv|supplinv|supplierinv|supplierinvoice)\b/.test(h))return 4;
+    if(/\b(tax|gst|orig\w*|ref)?\s*invoice\b|\b(voucher|vch|ref|reference|doc|document|challan|memo)\s*(no|num|number|#)\b|\b(vchno|voucherno|refno|docno)\b/.test(h))return 3;
+    if(/^(inv|bill|voucher|vch|ref|reference)$/.test(h))return 2;
+    return /^(no|num|number|#)$/.test(h)?1:0;
+  }],
   ['mapPaid',h=>!/date|dt|no|num/.test(h)?(/\b(paid|amount\s*paid|paid\s*amt|rcpt|receipt)\b/.test(h)?2:(/\b(settled|received)\b/.test(h)?1:0)):0],
   ['mapBal',h=>/\b(bal|balance|pend|pending|due\s*amt|due\s*amount|outstanding|closing)\b/.test(h)?2:0],
   ['mapDays',h=>/\b(credit|due|cr)?\s*days\b|\bterms\b/.test(h)?2:0],
   ['mapNotes',h=>/\b(note|notes|narr\w*|remark\w*|desc\w*)\b/.test(h)?2:0]
 ];
 const colLet=i=>{let s='';for(let n=i;n>=0;n=Math.floor(n/26)-1)s=String.fromCharCode(65+n%26)+s;return s};
-const billImpKey=(s,n,d,a)=>String(s||'').trim().toLowerCase()+'|'+String(n||'').trim().toLowerCase()+'|'+d+'|'+Math.round(Number(a)*100);
+const normSup=s=>String(s||'').trim().replace(/\s+/g,' ').toLowerCase();
+const alphaSup=s=>String(s||'').toLowerCase().replace(/[^a-z0-9]/g,'');
+const billImpKey=(s,n,d,a)=>normSup(s)+'|'+String(n||'').trim().toLowerCase()+'|'+d+'|'+Math.round(Number(a)*100);
+const supDateAmtKey=(s,d,a)=>normSup(s)+'|'+d+'|'+Math.round(Number(a)*100);
+function resolveSavedSup(raw){
+  const k=normSup(raw);if(!k)return '';
+  const hit=S.bills.find(b=>normSup(b.supplier)===k);
+  return hit?hit.supplier:String(raw||'').trim().slice(0,200);
+}
+function fmtImpNo(v){
+  if(v==null||v==='')return '';
+  const s=typeof v==='number'?(Number.isFinite(v)?String(v):''):String(v).replace(/\s+/g,' ').trim();
+  return (!s||/^[-–—]+$/.test(s))?'':s.slice(0,100);
+}
 function loadXlsx(){
   if(window.XLSX)return Promise.resolve(window.XLSX);
   const urls=['https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js','https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js'];
@@ -1164,10 +1222,10 @@ function parseImpDate(v){
   return '';
 }
 function detectHdrRow(rows){
-  let best=0,bestSc=-1;const kw=/sup|party|vendor|dist|ledger|comp|dealer|bill|inv|purch|vch|date|amt|amount|total|net|grand|paid|bal|pend|day|note|narr/;
-  for(let r=0;r<Math.min(15,rows.length);r++){
+  let best=0,bestSc=-1;const kw=/sup|party|vendor|dist|ledger|comp|dealer|bill|inv|purch|vch|ref|date|amt|amount|total|net|grand|credit|paid|bal|pend|day|note|narr/;
+  for(let r=0;r<Math.min(20,rows.length);r++){
     const cells=rows[r]||[];let hits=0,non=0;
-    cells.forEach(c=>{const t=String(c||'').trim().toLowerCase();if(!t)return;non++;if(kw.test(t))hits++});
+    cells.forEach(c=>{const t=String(c||'').trim().toLowerCase();if(!t)return;non++;if(!parseImpDate(t)&&!/^[\d.,\s]+$/.test(t)&&kw.test(t))hits++});
     const sc=hits*10+non;if(non>=2&&sc>bestSc){bestSc=sc;best=r}
   }
   return best;
@@ -1184,12 +1242,12 @@ function detectBannerSup(rows,hi,sheetName,fileName){
   for(let r=hi-1;r>=0;r--){
     const non=(rows[r]||[]).map(c=>String(c||'').trim()).filter(Boolean);
     if(!non.length)continue;
-    const t=cleanBannerSup(non[0]);if(t)return t;
+    const t=cleanBannerSup(non[0]);if(t)return resolveSavedSup(t);
   }
   const sh=cleanBannerSup(String(sheetName||'').replace(/^sheet\d*$/i,''));
-  if(sh)return sh;
+  if(sh)return resolveSavedSup(sh);
   const fn=cleanBannerSup(String(fileName||'').replace(/\.(xlsx?|xlsm|csv|tsv|txt)$/i,'').replace(/^(sheet|export|sample|template|inhaero|data|book\d*|untitled).*$/i,''));
-  if(fn)return fn;
+  if(fn)return resolveSavedSup(fn);
   return '';
 }
 function fillImpMaps(auto){
@@ -1205,49 +1263,94 @@ function fillImpMaps(auto){
     }else el.value=prev!==''&&Number(prev)<maxC?prev:'-1';
   });
 }
+function updImpSupHint(hasSupCol,curSup){
+  const box=$('impSupHint');
+  if(hasSupCol||!curSup){box.hidden=true;box.innerHTML='';return}
+  const k=normSup(curSup),ka=alphaSup(curSup),allSups=[...new Set(S.bills.map(b=>b.supplier).filter(Boolean))];
+  if(!ka||allSups.some(s=>normSup(s)===k)){box.hidden=true;box.innerHTML='';return}
+  const hits=allSups.filter(s=>{const a=alphaSup(s);return a.length>=4&&(a.includes(ka)||ka.includes(a))}).slice(0,3);
+  if(!hits.length){box.hidden=true;box.innerHTML='';return}
+  box.innerHTML=hits.map(s=>`<button type="button" data-usesup="${esc(s)}">Use saved: ${esc(s)}</button>`).join('');
+  box.hidden=false;
+}
 function updImpPreview(){
   const hi=Math.max(0,Number($('impHdr').value)||0),c={};IMP_FIELDS.forEach(([id])=>c[id]=Number($(id).value));
   const hasSupCol=c.mapSup>=0;$('impSupRow').hidden=hasSupCol;
   let curSup=hasSupCol?'':$('impDefSup').value.trim().slice(0,200);
+  updImpSupHint(hasSupCol,curSup);
   const skipDup=$('impSkipDup').checked,seen=new Set(S.bills.map(b=>billImpKey(b.supplier,b.no,b.date,b.amount)));
-  const ready=[];let dups=0,ign=0,totAmt=0;
+  const blankPool=new Map(),usedIds=new Set();
+  if(skipDup){
+    S.bills.forEach(b=>{
+      if(String(b.no||'').trim())return;
+      const k=supDateAmtKey(b.supplier,b.date,b.amount);
+      if(!blankPool.has(k))blankPool.set(k,[]);
+      blankPool.get(k).push(b);
+    });
+  }
+  const ready=[];let dups=0,ign=0,totAmt=0,addCount=0,updCount=0;
   for(let r=hi+1;r<impSt.rows.length;r++){
     const row=impSt.rows[r]||[],non=row.map(x=>String(x||'').trim()).filter(Boolean);if(!non.length)continue;
     if(!hasSupCol){
       if(c.mapDate>=0&&/\b(date|dt)\b/i.test(String(row[c.mapDate]||''))&&c.mapAmt>=0&&/\b(amt|amount|total)\b/i.test(String(row[c.mapAmt]||'')))continue;
       if(non.length===1&&!(c.mapDate>=0&&parseImpDate(row[c.mapDate]))&&!(c.mapAmt>=0&&Number.isFinite(parseImpNum(row[c.mapAmt])))){const bs=cleanBannerSup(non[0]);if(bs){curSup=bs;continue}}
     }
-    const sup=hasSupCol?String(row[c.mapSup]||'').trim().slice(0,200):curSup;
-    if(!sup||/^(grand\s*)?total\b|^sub\s*total\b/i.test(sup)){ign++;continue}
+    const rawSup=hasSupCol?String(row[c.mapSup]||'').trim().slice(0,200):curSup;
+    if(!rawSup||/^(grand\s*)?total\b|^sub\s*total\b|^closing\s*balance\b/i.test(rawSup)||(!hasSupCol&&non.some(x=>/^(grand\s*)?total\b|^sub\s*total\b|^closing\s*balance\b/i.test(x)))){ign++;continue}
     const amt=c.mapAmt>=0?parseImpNum(row[c.mapAmt]):NaN,dt=c.mapDate>=0?parseImpDate(row[c.mapDate]):'';
     if(!(amt>0)||amt>100000000||!dt){ign++;continue}
-    const no=c.mapNo>=0?String(row[c.mapNo]||'').trim().slice(0,100):'';
+    const sup=resolveSavedSup(rawSup);
+    const no=c.mapNo>=0?fmtImpNo(row[c.mapNo]):'';
     const dRaw=c.mapDays>=0?parseImpNum(row[c.mapDays]):NaN,days=Number.isFinite(dRaw)&&dRaw>=0?Math.min(3650,Math.round(dRaw)):S.defDays;
     const pRaw=c.mapPaid>=0?parseImpNum(row[c.mapPaid]):NaN,bRaw=c.mapBal>=0?parseImpNum(row[c.mapBal]):NaN;
     let paid=0;if(Number.isFinite(pRaw)&&pRaw>=0)paid=Math.min(amt,pRaw);else if(Number.isFinite(bRaw)&&bRaw>=0&&bRaw<=amt)paid=Math.max(0,Math.round((amt-bRaw)*100)/100);
     const notes=c.mapNotes>=0?String(row[c.mapNotes]||'').trim().slice(0,500):'';
     const k=billImpKey(sup,no,dt,amt);
     if(skipDup&&seen.has(k)){dups++;continue}
-    seen.add(k);ready.push({supplier:sup,no,amount:amt,date:dt,days,paid,notes});totAmt+=amt;
+    if(skipDup&&no){
+      const pool=blankPool.get(supDateAmtKey(sup,dt,amt))||[];
+      const hit=pool.find(b=>!usedIds.has(b.id));
+      if(hit){
+        usedIds.add(hit.id);seen.add(k);
+        ready.push({mode:'update',targetId:hit.id,supplier:hit.supplier,no,amount:amt,date:dt,paid:hit.paid||0,notes});
+        updCount++;totAmt+=amt;continue;
+      }
+    }
+    if(skipDup)seen.add(k);
+    ready.push({mode:'add',supplier:sup,no,amount:amt,date:dt,days,paid,notes});
+    addCount++;totAmt+=amt;
   }
-  impSt.ready=ready;
+  impSt.ready=ready;impSt.addCount=addCount;impSt.updCount=updCount;
   $('impMeta').textContent=impSt.name+' · '+impSt.rows.length+' rows';
-  $('impMapHint').textContent=((hasSupCol||ready.length>0||curSup)&&c.mapAmt>=0&&c.mapDate>=0)?'Auto-matched':'Select missing columns';
-  $('impSum').textContent=(ready.length?ready.length+' bill'+(ready.length===1?'':'s')+' ready ('+inr(totAmt)+')':(!hasSupCol&&!curSup&&c.mapAmt>=0&&c.mapDate>=0?'Type supplier name above':'No matching bills found'))+(dups?' · '+dups+' dup'+(dups===1?'':'s')+' skipped':'')+(ign?' · '+ign+' ignored':'');
-  $('impPrevBody').innerHTML=ready.slice(0,8).map(b=>`<tr><td>${esc(b.supplier)}</td><td>${esc(b.no||'–')}</td><td style="white-space:nowrap">${fmtShort(b.date)}</td><td>${inr(b.amount)}</td><td>${inr(b.paid)}</td></tr>`).join('')+(ready.length>8?`<tr><td colspan="5" class="meta">+ ${ready.length-8} more bills</td></tr>`:'')||'<tr><td colspan="5" class="meta">Open "Adjust columns" below if needed.</td></tr>';
-  $('impDoBtn').disabled=!ready.length;$('impDoBtn').textContent=ready.length?'Import '+ready.length+' bill'+(ready.length===1?'':'s'):'Nothing to import';
+  const hintEl=$('impMapHint');
+  if(c.mapAmt<0||c.mapDate<0){hintEl.textContent='Select missing columns';hintEl.style.color='var(--amber)'}
+  else if(c.mapNo<0){hintEl.textContent='Invoice no. not matched';hintEl.style.color='var(--amber)'}
+  else if(!hasSupCol&&!curSup){hintEl.textContent='Enter supplier name';hintEl.style.color='var(--amber)'}
+  else{hintEl.textContent='Auto-matched';hintEl.style.color=''}
+  let sumTxt='';
+  if(addCount&&updCount)sumTxt=addCount+' new + '+updCount+' inv update'+(updCount===1?'':'s')+' ('+inr(totAmt)+')';
+  else if(updCount)sumTxt=updCount+' bill'+(updCount===1?'':'s')+' ready to add invoice no. ('+inr(totAmt)+')';
+  else if(addCount)sumTxt=addCount+' bill'+(addCount===1?'':'s')+' ready ('+inr(totAmt)+')';
+  else sumTxt=(!hasSupCol&&!curSup&&c.mapAmt>=0&&c.mapDate>=0?'Type supplier name above':'No matching bills found');
+  $('impSum').textContent=sumTxt+(dups?' · '+dups+' dup'+(dups===1?'':'s')+' skipped':'')+(ign?' · '+ign+' ignored':'')+(ready.length&&c.mapNo<0?' · No invoice col':'');
+  $('impPrevBody').innerHTML=ready.slice(0,8).map(b=>`<tr><td>${esc(b.supplier)}</td><td>${esc(b.no||'–')}${b.mode==='update'?' <span class="tag open" style="font-size:.66rem;padding:1px 5px">Update</span>':''}</td><td style="white-space:nowrap">${fmtShort(b.date)}</td><td>${inr(b.amount)}</td><td>${inr(b.paid)}</td></tr>`).join('')+(ready.length>8?`<tr><td colspan="5" class="meta">+ ${ready.length-8} more bills</td></tr>`:'')||'<tr><td colspan="5" class="meta">Open "Adjust columns" below if needed.</td></tr>';
+  $('impDoBtn').disabled=!ready.length;
+  $('impDoBtn').textContent=addCount&&updCount?'Import '+addCount+' & Update '+updCount:updCount?'Add invoice to '+updCount+' bill'+(updCount===1?'':'s'):addCount?'Import '+addCount+' bill'+(addCount===1?'':'s'):'Nothing to import';
 }
 function loadImpRows(rows,name,sheet){
   impSt.rows=rows;impSt.name=name;impSt.sheet=sheet||'';
-  const maxH=Math.min(15,Math.max(1,rows.length));
+  const sups=[...new Set(S.bills.map(b=>b.supplier).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+  $('impSupList').innerHTML=sups.map(s=>`<option value="${esc(s)}"></option>`).join('');
+  const maxH=Math.min(20,Math.max(1,rows.length));
   $('impHdr').innerHTML=Array.from({length:maxH},(_,i)=>{const p=(rows[i]||[]).filter(c=>String(c||'').trim()!=='').slice(0,3).join(' · ');return `<option value="${i}">Row ${i+1}${p?': '+esc(p.slice(0,28)):''}</option>`}).join('');
   const hi=detectHdrRow(rows);$('impHdr').value=String(hi);
   fillImpMaps(true);
   const hasSupCol=Number($('mapSup').value)>=0;
   $('impDefSup').value=hasSupCol?'':detectBannerSup(rows,hi,sheet,name);
-  $('impMapBox').open=Number($('mapAmt').value)<0||Number($('mapDate').value)<0;
+  $('impMapBox').open=Number($('mapAmt').value)<0||Number($('mapDate').value)<0||Number($('mapNo').value)<0;
   updImpPreview();$('impModal').hidden=false;syncLock();
 }
+$('impSupHint').addEventListener('click',e=>{const b=e.target.closest('[data-usesup]');if(!b)return;$('impDefSup').value=b.dataset.usesup;updImpPreview()});
 $('impTplBtn').onclick=()=>{
   const rows=[['Supplier Name','Date Purchase','Invoice Number','Amount'],['ABC Pharma',iso(new Date()),'INV-101','5400'],['MedSupply',iso(new Date()),'INV-102','3200']];
   dl('inhaero-import-template.csv',csvRows(rows),'text/csv;charset=utf-8');toast('Sample CSV downloaded');
@@ -1283,16 +1386,31 @@ $('impSkipDup').onchange=updImpPreview;
 IMP_FIELDS.forEach(([id])=>$(id).onchange=updImpPreview);
 $('impDoBtn').onclick=()=>{
   if(!impSt.ready.length)return;
-  const rowsCopy=impSt.ready.slice(),tot=rowsCopy.reduce((s,r)=>s+r.amount,0);
-  askSaveLock('Confirm Excel import',rowsCopy.length+' bill'+(rowsCopy.length===1?'':'s')+' ('+inr(tot)+') — enter passcode to import.',()=>{
-    const now=Date.now(),prevLen=S.bills.length;
-    const added=rowsCopy.map((r,i)=>{
-      const item={id:now.toString(36)+i.toString(36)+Math.random().toString(36).slice(2,5),supplier:r.supplier,no:r.no,amount:r.amount,date:r.date,days:r.days,notes:r.notes,paid:r.paid,pays:r.paid>0?[{d:r.date,a:r.paid,r:'Imported'}]:[],created:r.date,updatedAt:now};
-      S.bills.push(item);S.dirty[item.id]=true;delete S.dels[item.id];return item;
+  const rowsCopy=impSt.ready.slice(),addN=impSt.addCount||0,updN=impSt.updCount||0,tot=rowsCopy.reduce((s,r)=>s+r.amount,0);
+  const title=updN&&!addN?'Confirm invoice update':'Confirm Excel import';
+  const msg=(addN&&updN?addN+' new + '+updN+' update':updN?updN+' invoice update'+(updN===1?'':'s'):addN+' bill'+(addN===1?'':'s'))+' ('+inr(tot)+') — enter passcode to save.';
+  askSaveLock(title,msg,()=>{
+    const now=Date.now(),prevLen=S.bills.length,added=[],updUndo=[],touched=[];
+    rowsCopy.forEach((r,i)=>{
+      if(r.mode==='update'){
+        const b=S.bills.find(x=>x.id===r.targetId);if(!b)return;
+        updUndo.push({b,no:b.no,notes:b.notes,updatedAt:b.updatedAt,dirty:!!S.dirty[b.id],del:!!S.dels[b.id]});
+        b.no=r.no;if(!b.notes&&r.notes)b.notes=r.notes;b.updatedAt=now;
+        S.dirty[b.id]=true;delete S.dels[b.id];touched.push(b);
+      }else{
+        const item={id:now.toString(36)+i.toString(36)+Math.random().toString(36).slice(2,5),supplier:r.supplier,no:r.no,amount:r.amount,date:r.date,days:r.days,notes:r.notes,paid:r.paid,pays:r.paid>0?[{d:r.date,a:r.paid,r:'Imported'}]:[],created:r.date,updatedAt:now};
+        S.bills.push(item);S.dirty[item.id]=true;delete S.dels[item.id];added.push(item);touched.push(item);
+      }
     });
-    if(!save()){S.bills.length=prevLen;added.forEach(item=>delete S.dirty[item.id]);toast('Storage full — backup or remove old photos');return}
-    closeImp();render();toast('Imported '+added.length+' bill'+(added.length===1?'':'s'));
-    window.fbPushBills?.(added);
+    if(!save()){
+      S.bills.length=prevLen;
+      added.forEach(item=>delete S.dirty[item.id]);
+      updUndo.forEach(u=>{u.b.no=u.no;u.b.notes=u.notes;u.b.updatedAt=u.updatedAt;if(!u.dirty)delete S.dirty[u.b.id];if(u.del)S.dels[u.b.id]=true});
+      toast('Storage full — backup or remove old photos');return;
+    }
+    const msgDone=added.length&&updUndo.length?'Imported '+added.length+' & updated '+updUndo.length:updUndo.length?'Added invoice no. to '+updUndo.length+' bill'+(updUndo.length===1?'':'s'):'Imported '+added.length+' bill'+(added.length===1?'':'s');
+    closeImp();render();toast(msgDone);
+    window.fbPushBills?.(touched);
   });
 };
 $('cloudPill').onclick=()=>window.fbSyncNow?window.fbSyncNow(true):toast('Connecting to Firebase…');
