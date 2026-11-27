@@ -658,7 +658,7 @@ function render(){
   S.bills.forEach((b,n)=>{
     const i=info(b),bd=b.date||'';buy+=b.amount;if(bd.slice(0,7)===ym)buyM+=b.amount;if(bd>=fyStart&&bd<=fyEnd)buyFY+=b.amount;
     if(i.bal>0){pend+=i.bal;due++;if(i.st==='overdue'){over+=i.bal;nOver++}if(i.st==='overdue'||i.st==='soon')attn.push({b,i})}
-    acts.push({d:b.created||b.date,seq:n*2,k:'buy',t:b.supplier,sub:'Purchase'+(b.no?' · Inv '+b.no:''),a:b.amount,s:i.bal<=0?'Paid':'Pending',bid:b.id,img:b.img||''});
+    acts.push({d:b.created||b.date,seq:n*2,k:'buy',t:b.supplier,sub:'Purchase'+(b.no?' · Inv '+b.no:''),a:b.amount,s:'Credit',bid:b.id,img:b.img||''});
     payEvents(b).forEach((p,k)=>{const pd=p.d||'';paid+=p.a;if(pd.slice(0,7)===ym)paidM+=p.a;if(pd>=fyStart&&pd<=fyEnd)paidFY+=p.a;acts.push({d:p.d,seq:n*2+1+k/100,k:'pay',t:b.supplier,sub:'Payment'+(b.no?' · Inv '+b.no:'')+(p.r?' · RT/Rcpt '+p.r:''),a:p.a,s:'Paid',bid:b.id,pidx:p.idx,img:p.img})});
   });
   const h=nowD.getHours();
@@ -775,7 +775,7 @@ function render(){
     S.bills.forEach(b=>payEvents(b).forEach(p=>{if(p.d===curDate)dayP.push({b,p})}));
     $('rDayH').textContent='Activity · '+fmt(curDate);
     $('rDayMeta').textContent=dayB.length+' bill'+(dayB.length===1?'':'s')+' · '+dayP.length+' paid';
-    $('rDayList').innerHTML=(dayB.map(b=>{const i=info(b);return `<div class="ditem"><div style="min-width:0"><b>${esc(b.supplier)}</b> <span class="tag ${i.st}">${i.st==='paid'?'Paid':'Bill'}</span><div class="meta">${b.no?'Inv <b>'+esc(b.no)+'</b>':'No inv no.'} · ${dueText(i)}${b.img?` <button type="button" class="pthumb" data-bimg="${b.id}"><svg class="i"><use href="#i-cam"/></svg>Photo</button>`:''}</div></div><div style="text-align:right;white-space:nowrap"><b>${inr(b.amount)}</b>${i.bal>0&&b.paid>0?`<div class="meta">bal ${inr(i.bal)}</div>`:''}</div></div>`}).join('')+
+    $('rDayList').innerHTML=(dayB.map(b=>{const i=info(b);return `<div class="ditem"><div style="min-width:0"><b>${esc(b.supplier)}</b> <span class="tag ${i.st==='paid'?'open':i.st}">Credit</span><div class="meta">${b.no?'Inv <b>'+esc(b.no)+'</b>':'No inv no.'} · ${dueText(i)}${b.img?` <button type="button" class="pthumb" data-bimg="${b.id}"><svg class="i"><use href="#i-cam"/></svg>Photo</button>`:''}</div></div><div style="text-align:right;white-space:nowrap"><b>${inr(b.amount)}</b>${i.bal>0&&b.paid>0?`<div class="meta">bal ${inr(i.bal)}</div>`:''}</div></div>`}).join('')+
       dayP.map(({b,p})=>`<div class="ditem"><div style="min-width:0"><b>${esc(b.supplier)}</b> <span class="tag paid">Paid</span><div class="meta">${b.no?'Inv <b>'+esc(b.no)+'</b>':'No inv no.'}${p.r?' · RT '+esc(p.r):''}${p.img&&p.idx>=0?` <button type="button" class="pthumb" data-img="${b.id}|${p.idx}"><svg class="i"><use href="#i-cam"/></svg>Photo</button>`:''}</div></div><div style="text-align:right;white-space:nowrap"><b style="color:var(--green)">+${inr(p.a)}</b></div></div>`).join(''))||`<div class="meta">No bills or payments on ${fmt(curDate)}.</div>`;
   }else $('rDayList').innerHTML='';
   if(dOn){
