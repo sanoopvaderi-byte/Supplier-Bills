@@ -155,6 +155,12 @@ input[type=file]::file-selector-button{margin-right:12px;border:0;border-radius:
 .pprev{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:12px;border:1px solid var(--line);background:var(--soft)}
 .pprev img{width:46px;height:46px;border-radius:9px;object-fit:cover;border:1px solid var(--line);cursor:pointer;flex:none;background:#fff}
 .pprev .tx{flex:1;min-width:0;line-height:1.25}.pprev .tx b{display:block;font-size:.88rem}
+.invbox{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:14px;border:1px solid var(--line);background:var(--soft)}
+.invbox img{width:50px;height:50px;border-radius:10px;object-fit:cover;border:1px solid var(--line);cursor:pointer;flex:none;background:#fff}
+.invbox .ic{width:44px;height:44px;border-radius:11px;display:grid;place-items:center;background:var(--blue-t);color:var(--blue);flex:none}
+.invbox .tx{flex:1;min-width:0;line-height:1.35}.invbox .tx b{display:block;font-size:.9rem;overflow-wrap:anywhere}
+.invlist{display:grid;gap:6px;width:100%}
+.invrow{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:.82rem;padding-top:6px;border-top:1px dashed var(--line)}.invrow:first-of-type{border-top:0;padding-top:0}
 .pthumb{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:99px;background:var(--blue-t);color:var(--blue);font-size:.74rem;font-weight:650;vertical-align:middle}
 .expgrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}.expgrid .btn{font-size:.84rem;padding:10px 8px;text-align:center;line-height:1.25}
 #modal,#imgModal,#impModal{position:fixed;inset:0;z-index:100;display:grid;place-items:center;padding:20px;background:rgba(10,17,29,.62);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)}
@@ -364,6 +370,10 @@ td:not(:first-child),th:not(:first-child){text-align:right;font-variant-numeric:
           </div>
           <label>Supplier<select id="paySup"></select></label>
           <label>Purchase bill no.<select id="payBill"></select></label>
+          <div class="full" id="payInvWrap" hidden>
+            <span class="lbl">Purchase bill invoice</span>
+            <div class="invbox" id="payInvBox"></div>
+          </div>
           <label class="full">RT / Receipt number<input id="payRt" placeholder="Optional · RT or receipt no."></label>
           <div class="full">
             <span class="lbl">Payment / Receipt photo (auto-compressed)</span>
@@ -874,9 +884,18 @@ function getPayMax(){
 }
 function updPayHint(){
   const sup=$('paySup').value,bid=$('payBill').value,open=openSupBills(sup),m=getPayMax();
-  if(!(m>0)){$('payBalHint').textContent='';return}
+  if(!(m>0)){$('payBalHint').textContent='';$('payInvWrap').hidden=true;$('payInvBox').innerHTML='';return}
   const f=bid==='__all'?null:open.find(x=>x.b.id===bid);
   $('payBalHint').textContent=(f?(f.b.no?'Bill '+f.b.no:fmtShort(f.b.date)):'All '+open.length+' bills')+' · Bal '+inr(m);
+  $('payInvWrap').hidden=false;
+  if(f){
+    const b=f.b,i=f.i;
+    $('payInvBox').innerHTML=(b.img?`<img src="${b.img}" alt="Purchase invoice" data-bimg="${b.id}">`:`<div class="ic"><svg class="i"><use href="#i-card"/></svg></div>`)+
+      `<div class="tx"><b>${b.no?'Invoice '+esc(b.no):'No invoice no.'} · ${fmt(b.date)}</b><div class="meta">Bill ${inr(b.amount)}${b.paid>0?' · Paid '+inr(b.paid):''} · Bal <b style="display:inline;color:var(--ink)">${inr(i.bal)}</b></div>${b.notes?`<div class="meta" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(b.notes)}</div>`:''}</div>`+
+      (b.img?`<button type="button" class="btn ghost sm" data-bimg="${b.id}" style="flex-shrink:0"><svg class="i"><use href="#i-cam"/></svg>View</button>`:`<span class="tag ${i.st}" style="flex-shrink:0">${dueText(i)}</span>`);
+  }else{
+    $('payInvBox').innerHTML='<div class="invlist">'+open.slice(0,4).map(({b,i})=>`<div class="invrow"><span><b>${b.no?'Inv '+esc(b.no):'No no.'}</b> · ${fmtShort(b.date)}${b.img?` <button type="button" class="pthumb" data-bimg="${b.id}"><svg class="i"><use href="#i-cam"/></svg>Invoice</button>`:''}</span><span>${inr(i.bal)}</span></div>`).join('')+(open.length>4?`<div class="meta">+ ${open.length-4} more open bills</div>`:'')+'</div>';
+  }
 }
 function fillPayBills(supMap){
   const sup=$('paySup').value;
@@ -911,7 +930,7 @@ $('paySubmit').onclick=()=>{
     for(const x of openSupBills(sup)){if(remC<=0.005)break;cov.push(x.b.no||'#'+fmtShort(x.b.date));remC-=x.i.bal}
     billDesc='Bills '+cov.slice(0,3).join(', ')+(cov.length>3?' +'+(cov.length-3)+' more':'');
   }else{
-    billDesc=oneB.no?'Bill '+oneB.no:fmtShort(oneB.date);
+    billDesc=oneB.no?'Invoice '+oneB.no+' ('+fmtShort(oneB.date)+' · '+inr(oneB.amount)+')':fmtShort(oneB.date)+' ('+inr(oneB.amount)+')';
   }
   askSaveLock('Confirm payment',sup+' · '+billDesc+' · '+inr(amt)+(rt?' · RT '+rt:'')+' — enter passcode to save.',()=>{
     if(bid==='__all'){
