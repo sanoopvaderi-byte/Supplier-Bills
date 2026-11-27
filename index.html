@@ -1039,14 +1039,14 @@ $('rst').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileRea
 }}catch(x){toast('Could not read that file')}$('rst').value=''};r.readAsText(f)};
 var impSt={wb:null,rows:[],ready:[],name:''};
 const IMP_FIELDS=[
-  ['mapSup',h=>/(supplier|party|vendor|distrib|ledger|dealer|company|firm|\bname\b)/.test(h)&&!/bill|inv|file/.test(h)],
-  ['mapAmt',h=>/(\b(bill|net|inv|invoice|total|grand)?\s*(amt|amount)\b|\bgrand\s*total\b|\btotal\b|\bvalue\b|\bcredit\b)/.test(h)&&!/paid|pay|bal|pend|due/.test(h)],
-  ['mapDate',h=>/\b(bill|inv|invoice|voucher|vch|purch\w*|entry)?\s*(date|dt)\b/.test(h)&&!/due|pay|rcpt|created/.test(h)],
-  ['mapNo',h=>/\b(bill|inv|invoice|voucher|vch|ref)\s*(no|num|#)|^invoice$/.test(h)],
-  ['mapPaid',h=>/\b(paid|pay\w*|rcpt|receipt|settled|received)\b/.test(h)&&!/date|dt|no|num/.test(h)],
-  ['mapBal',h=>/\b(bal|balance|pend|pending|due\s*amt|due\s*amount|outstanding|closing)\b/.test(h)],
-  ['mapDays',h=>/\b(credit|due|cr)?\s*days\b|\bterms\b/.test(h)],
-  ['mapNotes',h=>/\b(note|notes|narr\w*|remark\w*|desc\w*)\b/.test(h)]
+  ['mapSup',h=>!/bill|inv|file|item|prod|drug/.test(h)?(/supplier|party|vendor|distrib|ledger|dealer|company|firm/.test(h)?2:(/\bname\b/.test(h)?1:0)):0],
+  ['mapAmt',h=>!/paid|pay|bal|pend|due|day|term|qty/.test(h)?(/\b(bill|net|inv|invoice|total|grand)?\s*(amt|amount)\b|\bgrand\s*total\b/.test(h)?2:(/\btotal\b|\bvalue\b|^credit$/.test(h)?1:0)):0],
+  ['mapDate',h=>!/due|pay|rcpt|created|exp/.test(h)?(/\b(bill|inv|invoice|voucher|vch|purch\w*|entry)\s*(date|dt)\b/.test(h)?2:(/\b(date|dt)\b/.test(h)?1:0)):0],
+  ['mapNo',h=>/\b(bill|inv|invoice|voucher|vch|ref)\s*(no|num|#)|^invoice$/.test(h)?2:(/^no$/.test(h)?1:0)],
+  ['mapPaid',h=>!/date|dt|no|num/.test(h)?(/\b(paid|amount\s*paid|paid\s*amt|rcpt|receipt)\b/.test(h)?2:(/\b(settled|received)\b/.test(h)?1:0)):0],
+  ['mapBal',h=>/\b(bal|balance|pend|pending|due\s*amt|due\s*amount|outstanding|closing)\b/.test(h)?2:0],
+  ['mapDays',h=>/\b(credit|due|cr)?\s*days\b|\bterms\b/.test(h)?2:0],
+  ['mapNotes',h=>/\b(note|notes|narr\w*|remark\w*|desc\w*)\b/.test(h)?2:0]
 ];
 const colLet=i=>{let s='';for(let n=i;n>=0;n=Math.floor(n/26)-1)s=String.fromCharCode(65+n%26)+s;return s};
 const billImpKey=(s,n,d,a)=>String(s||'').trim().toLowerCase()+'|'+String(n||'').trim().toLowerCase()+'|'+d+'|'+Math.round(Number(a)*100);
@@ -1106,7 +1106,8 @@ function fillImpMaps(auto){
   IMP_FIELDS.forEach(([id,fn])=>{
     const el=$(id),prev=el.value;el.innerHTML=opts;
     if(auto){
-      const idx=hdr.findIndex((c,i)=>!used.has(i)&&fn(String(c||'').trim().toLowerCase().replace(/[^a-z0-9#]+/g,' ')));
+      let idx=-1,bSc=0;
+      hdr.forEach((c,i)=>{if(used.has(i))return;const sc=fn(String(c||'').toLowerCase().replace(/[^a-z0-9#]+/g,' ').trim());if(sc>bSc){bSc=sc;idx=i}});
       el.value=idx>=0?String(idx):'-1';if(idx>=0)used.add(idx);
     }else el.value=prev!==''&&Number(prev)<maxC?prev:'-1';
   });
