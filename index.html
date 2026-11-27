@@ -497,19 +497,18 @@ td:not(:first-child),th:not(:first-child){text-align:right;font-variant-numeric:
         <div style="min-width:0"><h2 id="impTitle">Import Excel / CSV</h2><div class="meta" id="impMeta"></div></div>
         <button class="icon-btn" type="button" data-impclose aria-label="Close"><svg class="i"><use href="#i-x"/></svg></button>
       </div>
+      <div id="impSheetRow" hidden><label>Sheet<select id="impSheet"></select></label></div>
+      <div id="impSupRow" hidden><label>Supplier name (for rows without supplier column)<input id="impDefSup" placeholder="e.g. MAJESTIC DRUGS"></label></div>
       <div class="meta" id="impSum" style="padding:8px 10px;border-radius:10px;background:var(--soft);color:var(--ink);font-weight:600"></div>
       <div class="scroll" style="max-height:210px;overflow:auto;border:1px solid var(--line);border-radius:12px;padding:0 6px">
         <table><thead><tr><th>Supplier</th><th>Inv no.</th><th>Date</th><th>Amount</th><th>Paid</th></tr></thead><tbody id="impPrevBody"></tbody></table>
       </div>
       <label style="display:flex;align-items:center;gap:10px;font-size:.86rem;color:var(--ink);cursor:pointer"><input id="impSkipDup" type="checkbox" checked style="width:20px;height:20px;min-height:20px;flex:none"><span>Skip duplicate bills already saved</span></label>
       <details id="impMapBox" class="impdet">
-        <summary><span>Adjust columns / sheet</span><span class="meta" id="impMapHint"></span></summary>
-        <div class="mgrid" style="margin-bottom:8px">
-          <label id="impSheetRow" hidden>Sheet<select id="impSheet"></select></label>
-          <label>Header row<select id="impHdr"></select></label>
-        </div>
+        <summary><span>Adjust columns / header row</span><span class="meta" id="impMapHint"></span></summary>
+        <label style="margin-bottom:8px">Header row<select id="impHdr"></select></label>
         <div class="mgrid">
-          <label>Supplier *<select id="mapSup"></select></label>
+          <label>Supplier<select id="mapSup"></select></label>
           <label>Amount *<select id="mapAmt"></select></label>
           <label>Date purchase *<select id="mapDate"></select></label>
           <label>Invoice no.<select id="mapNo"></select></label>
@@ -1104,7 +1103,7 @@ function parseImpDate(v){
   if(v instanceof Date&&!isNaN(v))return mk(v.getFullYear(),v.getMonth()+1,v.getDate());
   const raw=String(v==null?'':v).trim();if(!raw)return '';
   if(typeof v==='number'||/^\d{5}(\.\d+)?$/.test(raw)){const n=Number(raw);if(n>=20000&&n<=80000){const d=new Date(Date.UTC(1899,11,30)+Math.floor(n+1e-6)*864e5);return mk(d.getUTCFullYear(),d.getUTCMonth()+1,d.getUTCDate())}}
-  const s=raw.replace(/\s+\d{1,2}:\d{2}(:\d{2})?(\s*(am|pm))?$/i,'').trim();
+  const s=raw.replace(/\s+\d{1,2}:\d{2}(:\d{2})?(\s*(am|pm))?$/i,'').replace(/^[\s.,;:|]+|[\s.,;:|]+$/g,'').replace(/\s*([-/.])\s*/g,'$1').trim();
   let a=s.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/);
   if(a)return mk(+a[1],+a[2],+a[3]);
   a=s.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})$/);
@@ -1122,6 +1121,19 @@ function detectHdrRow(rows){
   }
   return best;
 }
+function detectBannerSup(rows,hi,sheetName,fileName){
+  for(let r=hi-1;r>=0;r--){
+    const non=(rows[r]||[]).map(c=>String(c||'').trim()).filter(Boolean);
+    if(!non.length)continue;
+    const t=non[0];
+    if(/[a-z]/i.test(t)&&!parseImpDate(t)&&!/^(period|from|to|report|purchase\s*register|date|total|grand|sub\s*total|page|sl\.?\s*no|sr\.?\s*no)\b/i.test(t))return t.slice(0,200);
+  }
+  const sh=String(sheetName||'').trim();
+  if(sh&&!/^sheet\d*$/i.test(sh))return sh.slice(0,200);
+  const fn=String(fileName||'').replace(/\.(xlsx?|xlsm|csv|tsv|txt)$/i,'').trim();
+  if(fn&&/[a-z]/i.test(fn)&&!/^(sheet|export|sample|template|inhaero|purchase|bills|report|data|book\d*|untitled)/i.test(fn))return fn.slice(0,200);
+  return '';
+}
 function fillImpMaps(auto){
   const hi=Math.max(0,Number($('impHdr').value)||0),hdr=impSt.rows[hi]||[],maxC=Math.max(hdr.length,...impSt.rows.slice(hi,hi+12).map(r=>(r||[]).length));
   const opts='<option value="-1">— Skip —</option>'+Array.from({length:maxC},(_,i)=>{const t=String(hdr[i]||'').trim();return `<option value="${i}">${colLet(i)}${t?': '+esc(t.slice(0,26)):''}</option>`}).join('');
@@ -1137,11 +1149,17 @@ function fillImpMaps(auto){
 }
 function updImpPreview(){
   const hi=Math.max(0,Number($('impHdr').value)||0),c={};IMP_FIELDS.forEach(([id])=>c[id]=Number($(id).value));
+  const hasSupCol=c.mapSup>=0;$('impSupRow').hidden=hasSupCol;
+  let curSup=hasSupCol?'':$('impDefSup').value.trim().slice(0,200);
   const skipDup=$('impSkipDup').checked,seen=new Set(S.bills.map(b=>billImpKey(b.supplier,b.no,b.date,b.amount)));
   const ready=[];let dups=0,ign=0,totAmt=0;
   for(let r=hi+1;r<impSt.rows.length;r++){
-    const row=impSt.rows[r]||[];if(!row.some(x=>String(x||'').trim()!==''))continue;
-    const sup=c.mapSup>=0?String(row[c.mapSup]||'').trim().slice(0,200):'';
+    const row=impSt.rows[r]||[],non=row.map(x=>String(x||'').trim()).filter(Boolean);if(!non.length)continue;
+    if(!hasSupCol){
+      if(c.mapDate>=0&&/\b(date|dt)\b/i.test(String(row[c.mapDate]||''))&&c.mapAmt>=0&&/\b(amt|amount|total)\b/i.test(String(row[c.mapAmt]||'')))continue;
+      if(non.length===1&&!(c.mapDate>=0&&parseImpDate(row[c.mapDate]))&&!(c.mapAmt>=0&&Number.isFinite(parseImpNum(row[c.mapAmt])))&&/[a-z]/i.test(non[0])&&!/^(grand\s*)?total\b|^sub\s*total\b|^page\b|^period\b|^from\b|^sr\.?\s*no|^sl\.?\s*no/i.test(non[0])){curSup=non[0].slice(0,200);continue}
+    }
+    const sup=hasSupCol?String(row[c.mapSup]||'').trim().slice(0,200):curSup;
     if(!sup||/^(grand\s*)?total\b|^sub\s*total\b/i.test(sup)){ign++;continue}
     const amt=c.mapAmt>=0?parseImpNum(row[c.mapAmt]):NaN,dt=c.mapDate>=0?parseImpDate(row[c.mapDate]):'';
     if(!(amt>0)||amt>100000000||!dt){ign++;continue}
@@ -1156,18 +1174,20 @@ function updImpPreview(){
   }
   impSt.ready=ready;
   $('impMeta').textContent=impSt.name+' · '+impSt.rows.length+' rows';
-  $('impMapHint').textContent=(c.mapSup>=0&&c.mapAmt>=0&&c.mapDate>=0)?'Auto-matched':'Select missing columns';
-  $('impSum').textContent=(ready.length?ready.length+' bill'+(ready.length===1?'':'s')+' ready ('+inr(totAmt)+')':'No matching bills found')+(dups?' · '+dups+' dup'+(dups===1?'':'s')+' skipped':'')+(ign?' · '+ign+' ignored':'');
+  $('impMapHint').textContent=((hasSupCol||ready.length>0||curSup)&&c.mapAmt>=0&&c.mapDate>=0)?'Auto-matched':'Select missing columns';
+  $('impSum').textContent=(ready.length?ready.length+' bill'+(ready.length===1?'':'s')+' ready ('+inr(totAmt)+')':(!hasSupCol&&!curSup&&c.mapAmt>=0&&c.mapDate>=0?'Type supplier name above':'No matching bills found'))+(dups?' · '+dups+' dup'+(dups===1?'':'s')+' skipped':'')+(ign?' · '+ign+' ignored':'');
   $('impPrevBody').innerHTML=ready.slice(0,8).map(b=>`<tr><td>${esc(b.supplier)}</td><td>${esc(b.no||'–')}</td><td style="white-space:nowrap">${fmtShort(b.date)}</td><td>${inr(b.amount)}</td><td>${inr(b.paid)}</td></tr>`).join('')+(ready.length>8?`<tr><td colspan="5" class="meta">+ ${ready.length-8} more bills</td></tr>`:'')||'<tr><td colspan="5" class="meta">Open "Adjust columns" below if needed.</td></tr>';
   $('impDoBtn').disabled=!ready.length;$('impDoBtn').textContent=ready.length?'Import '+ready.length+' bill'+(ready.length===1?'':'s'):'Nothing to import';
 }
-function loadImpRows(rows,name){
-  impSt.rows=rows;impSt.name=name;
+function loadImpRows(rows,name,sheet){
+  impSt.rows=rows;impSt.name=name;impSt.sheet=sheet||'';
   const maxH=Math.min(15,Math.max(1,rows.length));
   $('impHdr').innerHTML=Array.from({length:maxH},(_,i)=>{const p=(rows[i]||[]).filter(c=>String(c||'').trim()!=='').slice(0,3).join(' · ');return `<option value="${i}">Row ${i+1}${p?': '+esc(p.slice(0,28)):''}</option>`}).join('');
-  $('impHdr').value=String(detectHdrRow(rows));
+  const hi=detectHdrRow(rows);$('impHdr').value=String(hi);
   fillImpMaps(true);
-  $('impMapBox').open=Number($('mapSup').value)<0||Number($('mapAmt').value)<0||Number($('mapDate').value)<0;
+  const hasSupCol=Number($('mapSup').value)>=0;
+  $('impDefSup').value=hasSupCol?'':detectBannerSup(rows,hi,sheet,name);
+  $('impMapBox').open=Number($('mapAmt').value)<0||Number($('mapDate').value)<0;
   updImpPreview();$('impModal').hidden=false;syncLock();
 }
 $('impTplBtn').onclick=()=>{
@@ -1182,7 +1202,7 @@ $('impFile').onchange=async e=>{
     if(/\.(csv|tsv|txt)$/i.test(f.name)){
       const txt=await f.text(),rows=parseCsv(txt);
       if(!rows.length){toast('That file is empty');return}
-      impSt.wb=null;$('impSheetRow').hidden=true;loadImpRows(rows,f.name);
+      impSt.wb=null;$('impSheetRow').hidden=true;loadImpRows(rows,f.name,'');
     }else{
       toast('Reading Excel file…');
       let X;try{X=await loadXlsx()}catch(err){toast('Excel (.xlsx) reader needs internet once, or save as CSV');return}
@@ -1193,13 +1213,14 @@ $('impFile').onchange=async e=>{
       $('impSheetRow').hidden=names.length<=1;
       const rows=sheetRows(wb,names[0]);
       if(!rows.length){toast('That sheet is empty');return}
-      loadImpRows(rows,f.name);
+      loadImpRows(rows,f.name,names[0]);
     }
   }catch(err){console.error('Import parse error:',err);toast('Could not read that file')}
   finally{$('impFile').value=''}
 };
-$('impSheet').onchange=()=>{if(!impSt.wb||!window.XLSX)return;const rows=sheetRows(impSt.wb,$('impSheet').value);if(!rows.length){toast('That sheet is empty');return}loadImpRows(rows,impSt.name)};
-$('impHdr').onchange=()=>{fillImpMaps(true);updImpPreview()};
+$('impSheet').onchange=()=>{if(!impSt.wb||!window.XLSX)return;const sh=$('impSheet').value,rows=sheetRows(impSt.wb,sh);if(!rows.length){toast('That sheet is empty');return}loadImpRows(rows,impSt.name,sh)};
+$('impHdr').onchange=()=>{fillImpMaps(true);const hi=Number($('impHdr').value)||0;if(Number($('mapSup').value)<0&&!$('impDefSup').value.trim())$('impDefSup').value=detectBannerSup(impSt.rows,hi,impSt.sheet,impSt.name);updImpPreview()};
+$('impDefSup').oninput=updImpPreview;
 $('impSkipDup').onchange=updImpPreview;
 IMP_FIELDS.forEach(([id])=>$(id).onchange=updImpPreview);
 $('impDoBtn').onclick=()=>{
