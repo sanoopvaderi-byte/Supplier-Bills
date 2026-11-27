@@ -619,7 +619,7 @@ function supplierBoxes(onlyPend,q){
   const keys=Object.keys(groups).sort((a,b)=>groups[b].pend-groups[a].pend||a.localeCompare(b));
   if(!keys.length)return `<div class="card">${empty('inbox','No matching bills')}</div>`;
   return keys.map(k=>{const g=groups[k];
-    return `<div class="sbox"><div class="shead"><div class="av">${esc(k.trim().charAt(0).toUpperCase()||'?')}</div><div class="tx"><b>${esc(k)}</b><span class="meta">${g.bills.length} bill${g.bills.length>1?'s':''} · billed ${inr(g.amt)}</span></div><div class="amt">${inr(g.pend)}<small>pending</small></div></div>`+
+    return `<div class="sbox"><div class="shead"><div class="av">${esc(k.trim().charAt(0).toUpperCase()||'?')}</div><div class="tx"><b>${esc(k)}</b><span class="meta">${g.bills.length} bill${g.bills.length>1?'s':''} · billed ${inr(g.amt)} · <button type="button" class="link" data-rensup="${esc(k)}" style="min-height:0;padding:0;font-size:.8rem">Rename</button></span></div><div class="amt">${inr(g.pend)}<small>pending</small></div></div>`+
     g.bills.sort((x,y)=>x.i.due-y.i.due).map(({b,i})=>`<div class="sline"><span class="no">Bill ${esc(b.no||'–')} <span class="meta">· ${fmt(b.date)}</span>${b.img?` <button type="button" class="pthumb" data-bimg="${b.id}"><svg class="i"><use href="#i-cam"/></svg>Photo</button>`:''}</span><span class="amt">${inr(b.amount)}${i.bal<=0?' <span class="tag paid">Paid</span>':(b.paid>0?'<small>bal '+inr(i.bal)+'</small>':'')}</span></div>`).join('')+`</div>`}).join('');
 }
 function chips(el,items,cur,attr){el.innerHTML=items.map(([k,l])=>`<button type="button" ${attr}="${k}" class="${k===cur?'on':''}">${l}</button>`).join('')}
@@ -788,6 +788,12 @@ document.addEventListener('click',e=>{
   const f=e.target.closest('[data-f]');if(f){listF=f.dataset.f;render();return}
   const sf=e.target.closest('[data-sf]');if(sf){srchF=sf.dataset.sf;render();return}
   const km=e.target.closest('[data-kmode]');if(km){homeKpi=km.dataset.kmode;render();return}
+  const rs=e.target.closest('[data-rensup]');
+  if(rs){const oldN=rs.dataset.rensup,list=S.bills.filter(b=>b.supplier===oldN);if(!list.length)return;
+    const nw=(prompt('Rename supplier across '+list.length+' bill'+(list.length===1?'':'s')+':',oldN)||'').trim().slice(0,200);
+    if(!nw||nw===oldN)return;
+    const now=Date.now();list.forEach(b=>{b.supplier=nw;b.updatedAt=now;S.dirty[b.id]=true});
+    save();render();toast('Renamed to '+nw);window.fbPushBills?.(list);return}
   const d=e.target.closest('[data-d]');if(d){$('days').value=d.dataset.d;dueUpd()}
 });
 /* entry */
@@ -1121,17 +1127,24 @@ function detectHdrRow(rows){
   }
   return best;
 }
+function cleanBannerSup(raw){
+  let t=String(raw||'').replace(/\s+/g,' ').trim();
+  if(!t||parseImpDate(t))return '';
+  t=t.replace(/^(ledger(\s*account)?(\s*of)?|account\s*(statement|of)?|supplier(\s*name)?|party(\s*name)?|statement\s*of)\s*[:\-–]?\s*/i,'');
+  t=t.replace(/\s+(transactions\s*)?(from|for\s+the\s+period|period)\s*[:\-–]?\s*\d{1,4}[-/.].*$/i,'').replace(/\s+(transactions|statement|ledger)\s*$/i,'').replace(/^[:\-–,\s]+|[:\-–.\s]+$/g,'').trim();
+  if(!t||!/[a-z]/i.test(t)||parseImpDate(t)||/^(period|from|to|report|purchase(\s*register|\s*report|\s*list)?|purchases|ledger(\s*account)?|statement|account|date|total|grand|sub\s*total|page|sl\.?\s*no|sr\.?\s*no|suppliers?)$/i.test(t))return '';
+  return t.slice(0,200);
+}
 function detectBannerSup(rows,hi,sheetName,fileName){
   for(let r=hi-1;r>=0;r--){
     const non=(rows[r]||[]).map(c=>String(c||'').trim()).filter(Boolean);
     if(!non.length)continue;
-    const t=non[0];
-    if(/[a-z]/i.test(t)&&!parseImpDate(t)&&!/^(period|from|to|report|purchase\s*register|date|total|grand|sub\s*total|page|sl\.?\s*no|sr\.?\s*no)\b/i.test(t))return t.slice(0,200);
+    const t=cleanBannerSup(non[0]);if(t)return t;
   }
-  const sh=String(sheetName||'').trim();
-  if(sh&&!/^sheet\d*$/i.test(sh))return sh.slice(0,200);
-  const fn=String(fileName||'').replace(/\.(xlsx?|xlsm|csv|tsv|txt)$/i,'').trim();
-  if(fn&&/[a-z]/i.test(fn)&&!/^(sheet|export|sample|template|inhaero|purchase|bills|report|data|book\d*|untitled)/i.test(fn))return fn.slice(0,200);
+  const sh=cleanBannerSup(String(sheetName||'').replace(/^sheet\d*$/i,''));
+  if(sh)return sh;
+  const fn=cleanBannerSup(String(fileName||'').replace(/\.(xlsx?|xlsm|csv|tsv|txt)$/i,'').replace(/^(sheet|export|sample|template|inhaero|data|book\d*|untitled).*$/i,''));
+  if(fn)return fn;
   return '';
 }
 function fillImpMaps(auto){
@@ -1157,7 +1170,7 @@ function updImpPreview(){
     const row=impSt.rows[r]||[],non=row.map(x=>String(x||'').trim()).filter(Boolean);if(!non.length)continue;
     if(!hasSupCol){
       if(c.mapDate>=0&&/\b(date|dt)\b/i.test(String(row[c.mapDate]||''))&&c.mapAmt>=0&&/\b(amt|amount|total)\b/i.test(String(row[c.mapAmt]||'')))continue;
-      if(non.length===1&&!(c.mapDate>=0&&parseImpDate(row[c.mapDate]))&&!(c.mapAmt>=0&&Number.isFinite(parseImpNum(row[c.mapAmt])))&&/[a-z]/i.test(non[0])&&!/^(grand\s*)?total\b|^sub\s*total\b|^page\b|^period\b|^from\b|^sr\.?\s*no|^sl\.?\s*no/i.test(non[0])){curSup=non[0].slice(0,200);continue}
+      if(non.length===1&&!(c.mapDate>=0&&parseImpDate(row[c.mapDate]))&&!(c.mapAmt>=0&&Number.isFinite(parseImpNum(row[c.mapAmt])))){const bs=cleanBannerSup(non[0]);if(bs){curSup=bs;continue}}
     }
     const sup=hasSupCol?String(row[c.mapSup]||'').trim().slice(0,200):curSup;
     if(!sup||/^(grand\s*)?total\b|^sub\s*total\b/i.test(sup)){ign++;continue}
