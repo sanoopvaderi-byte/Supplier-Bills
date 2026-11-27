@@ -158,6 +158,7 @@ input[type=file]::file-selector-button{margin-right:12px;border:0;border-radius:
 .pthumb{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:99px;background:var(--blue-t);color:var(--blue);font-size:.74rem;font-weight:650;vertical-align:middle}
 .expgrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}.expgrid .btn{font-size:.84rem;padding:10px 8px;text-align:center;line-height:1.25}
 #modal,#imgModal,#impModal{position:fixed;inset:0;z-index:100;display:grid;place-items:center;padding:20px;background:rgba(10,17,29,.62);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)}
+#modal{z-index:120}
 #imgModal{z-index:110;padding:16px}
 #impModal{z-index:105;padding:14px}
 .mbox,.imbox,.impbox{width:100%;max-width:380px;background:var(--surface);border:1px solid var(--line);border-radius:22px;padding:20px;box-shadow:0 24px 60px rgba(0,0,0,.35);animation:in .2s ease both}
@@ -463,7 +464,7 @@ td:not(:first-child),th:not(:first-child){text-align:right;font-variant-numeric:
     <div class="mbox" role="dialog" aria-modal="true" aria-labelledby="mTitle">
       <div id="mStep1">
         <h2 id="mTitle">Enter PIN</h2>
-        <p class="meta" style="margin:4px 0 14px">Enter the 4-digit PIN to unlock the reset.</p>
+        <p class="meta" id="mSub" style="margin:4px 0 14px">Enter the 4-digit PIN to unlock the reset.</p>
         <input id="pin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" placeholder="••••" aria-label="PIN" style="text-align:center;letter-spacing:.6em;font-size:22px">
         <p id="pinErr" class="meta" style="color:var(--red);margin:8px 0 0" hidden></p>
         <div class="acts" style="margin-top:16px"><button class="btn ghost" type="button" data-close>Cancel</button><button class="btn" id="pinOk" type="button">Unlock</button></div>
@@ -845,12 +846,15 @@ document.addEventListener('click',e=>{if(!e.target.closest('#supWrap'))hideSupDr
 $('add').onclick=()=>{
   const supplier=$('supplier').value.trim(),amount=parseFloat($('amount').value),date=$('date').value;
   if(!supplier||!(amount>0)||!date){toast('Enter supplier, amount and bill date');return}
-  const item={id:Date.now().toString(36)+Math.random().toString(36).slice(2,5),supplier,no:$('no').value.trim(),amount,date,days:Number($('days').value)||0,notes:$('notes').value.trim(),paid:0,pays:[],created:iso(new Date()),updatedAt:Date.now()};
-  if(entryPhotoData)item.img=entryPhotoData;
-  S.bills.push(item);S.dirty[item.id]=true;delete S.dels[item.id];
-  if(!save()){S.bills.pop();delete S.dirty[item.id];toast('Storage full — backup or remove old photos');return}
-  ['supplier','no','amount','notes'].forEach(k=>$(k).value='');clearEntryPhoto();hideSupDrop();toast('Bill saved · add the next one');render();skipDrop=true;$('supplier').focus({preventScroll:true});skipDrop=false;
-  window.fbPushBill?.(item);
+  const no=$('no').value.trim(),days=Number($('days').value)||0,notes=$('notes').value.trim(),img=entryPhotoData;
+  askSaveLock('Confirm purchase bill',supplier+(no?' · Bill '+no:'')+' · '+inr(amount)+' — enter passcode to save.',()=>{
+    const item={id:Date.now().toString(36)+Math.random().toString(36).slice(2,5),supplier,no,amount,date,days,notes,paid:0,pays:[],created:iso(new Date()),updatedAt:Date.now()};
+    if(img)item.img=img;
+    S.bills.push(item);S.dirty[item.id]=true;delete S.dels[item.id];
+    if(!save()){S.bills.pop();delete S.dirty[item.id];toast('Storage full — backup or remove old photos');return}
+    ['supplier','no','amount','notes'].forEach(k=>$(k).value='');clearEntryPhoto();hideSupDrop();toast('Bill saved · add the next one');render();skipDrop=true;$('supplier').focus({preventScroll:true});skipDrop=false;
+    window.fbPushBill?.(item);
+  });
 };
 function recordPay(b,v,r,img){
   const bal=info(b).bal;v=Math.min(v,bal);if(!(v>0))return false;
@@ -893,24 +897,26 @@ $('paySubmit').onclick=()=>{
   const maxBal=getPayMax();
   if(!(maxBal>0)){toast('No pending bill selected');return}
   if(amt>maxBal+0.005){toast('Amount exceeds balance (max '+inr(maxBal)+')');$('payAmt').focus();return}
-  if(bid==='__all'){
-    const list=S.bills.map(b=>({b,i:info(b)})).filter(x=>x.i.bal>0&&x.b.supplier===sup).sort((a,c)=>a.i.due-c.i.due);
-    const snap=list.map(x=>({b:x.b,p:x.b.paid||0,l:x.b.pays.length,u:x.b.updatedAt}));
-    let rem=amt,img=payPhotoData;const d=iso(new Date()),now=Date.now(),touched=[];
-    for(const x of list){
-      if(rem<=0.005)break;
-      const sl=Math.round(Math.min(rem,x.i.bal)*100)/100;rem=Math.max(0,rem-sl);
-      x.b.paid=(x.b.paid||0)+sl;x.b.updatedAt=now;
-      const ent={d,a:sl,r:rt};if(img){ent.img=img;img=''}
-      x.b.pays.push(ent);S.dirty[x.b.id]=true;delete S.dels[x.b.id];touched.push(x.b);
-    }
-    if(!save()){snap.forEach(s=>{s.b.paid=s.p;s.b.pays.length=s.l;s.b.updatedAt=s.u;delete S.dirty[s.b.id]});toast('Storage full — backup or remove old photos');return}
-    toast(inr(amt)+' payment recorded across '+sup);window.fbPushBills?.(touched);
-  }else{
-    const b=S.bills.find(x=>x.id===bid);
-    if(!b||!recordPay(b,amt,rt,payPhotoData))return;
-  }
-  $('payAmt').value='';$('payRt').value='';clearPayPhoto();render();
+  const oneB=bid==='__all'?null:S.bills.find(x=>x.id===bid);
+  if(bid!=='__all'&&!oneB)return;
+  const imgKeep=payPhotoData;
+  askSaveLock('Confirm payment',sup+' · '+inr(amt)+(rt?' · RT '+rt:'')+' — enter passcode to save.',()=>{
+    if(bid==='__all'){
+      const list=S.bills.map(b=>({b,i:info(b)})).filter(x=>x.i.bal>0&&x.b.supplier===sup).sort((a,c)=>a.i.due-c.i.due);
+      const snap=list.map(x=>({b:x.b,p:x.b.paid||0,l:x.b.pays.length,u:x.b.updatedAt}));
+      let rem=amt,img=imgKeep;const d=iso(new Date()),now=Date.now(),touched=[];
+      for(const x of list){
+        if(rem<=0.005)break;
+        const sl=Math.round(Math.min(rem,x.i.bal)*100)/100;rem=Math.max(0,rem-sl);
+        x.b.paid=(x.b.paid||0)+sl;x.b.updatedAt=now;
+        const ent={d,a:sl,r:rt};if(img){ent.img=img;img=''}
+        x.b.pays.push(ent);S.dirty[x.b.id]=true;delete S.dels[x.b.id];touched.push(x.b);
+      }
+      if(!save()){snap.forEach(s=>{s.b.paid=s.p;s.b.pays.length=s.l;s.b.updatedAt=s.u;delete S.dirty[s.b.id]});toast('Storage full — backup or remove old photos');return}
+      toast(inr(amt)+' payment recorded across '+sup);window.fbPushBills?.(touched);
+    }else if(!recordPay(oneB,amt,rt,imgKeep))return;
+    $('payAmt').value='';$('payRt').value='';clearPayPhoto();render();
+  });
 };
 $('list').addEventListener('change',async e=>{
   const id=e.target.dataset.limg;if(!id)return;
@@ -929,8 +935,9 @@ $('list').onclick=e=>{
   if(qs){$('q').value=qs.dataset.qsup;render();return}
   const bt=e.target.closest('button');if(!bt)return;
   const p=bt.dataset.pay,d=bt.dataset.del;
-  if(p){const v=parseFloat($('p-'+p).value);if(!(v>0)){toast('Enter the amount paid');return}
-    if(recordPay(S.bills.find(x=>x.id===p),v,$('r-'+p).value,listPhotos[p]||''))delete listPhotos[p];}
+  if(p){const b=S.bills.find(x=>x.id===p),v=parseFloat($('p-'+p).value),rt=$('r-'+p).value;if(!(v>0)){toast('Enter the amount paid');return}
+    if(!b||!(info(b).bal>0))return;
+    askSaveLock('Confirm payment',b.supplier+(b.no?' · Bill '+b.no:'')+' · '+inr(Math.min(v,info(b).bal))+' — enter passcode to save.',()=>{if(recordPay(b,v,rt,listPhotos[p]||''))delete listPhotos[p]});}
   if(d&&confirm('Delete this bill?')){delete listPhotos[d];delete S.dirty[d];S.dels[d]=true;S.bills=S.bills.filter(x=>x.id!==d);save();render();toast('Bill deleted');window.fbDeleteBill?.(d)}
 };
 $('sdays').onchange=()=>{S.defDays=Math.max(0,Number($('sdays').value)||0);S.defDaysAt=Date.now();$('days').value=S.defDays;save();render();dueUpd();window.fbPushSettings?.()};
@@ -996,8 +1003,9 @@ function exportData(kind,dateFilter){
   toast('Export downloaded');
 }
 document.addEventListener('click',e=>{const x=e.target.closest('[data-exp]');if(x)exportData(x.dataset.exp,x.closest('#v-reports')?($('rDateSel').value||$('rMonSel').dataset.val||''):'')});
-/* PIN-locked reset */
+/* PIN & confirm passcode locks */
 const PIN_HASH='75dedb59f3148146392cab81dd4e8bd071e99a05764f151e5e7caaebc550db0e';
+const SAVE_HASH='9e57e8ffc54c3b2ac9d6907f63642002dd7cbdd7b5c4b1c75fc134cc32b523fd';
 function sha256(s){
   const K=[],r=(n,x)=>(n>>>x)|(n<<(32-x));
   for(let p=2,i=0;i<64;p++){let q=1;for(let d=2;d*d<=p;d++)if(p%d===0){q=0;break}if(q)K[i++]=(Math.pow(p,1/3)%1*2**32)|0}
@@ -1013,15 +1021,17 @@ function sha256(s){
   }
   return H.map(v=>(v>>>0).toString(16).padStart(8,'0')).join('');
 }
-async function pinOk(v){
-  if(window.crypto&&crypto.subtle){try{const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode('inhaero:'+v));return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')===PIN_HASH}catch(e){}}
-  return sha256('inhaero:'+v)===PIN_HASH;
+async function pinOk(v,target=PIN_HASH){
+  if(window.crypto&&crypto.subtle){try{const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode('inhaero:'+v));return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')===target}catch(e){}}
+  return sha256('inhaero:'+v)===target;
 }
-let pinTries=0,pinLockUntil=0;
-function modal(step){$('modal').hidden=step===0;$('mStep1').hidden=step!==1;$('mStep2').hidden=step!==2;
-  if(step===1){$('pin').value='';$('pinErr').hidden=true;setTimeout(()=>$('pin').focus(),50)}
+let pinTries=0,pinLockUntil=0,pinCfg=null;
+function modal(step,cfg){$('modal').hidden=step===0;$('mStep1').hidden=step!==1;$('mStep2').hidden=step!==2;
+  if(step===0)pinCfg=null;
+  if(step===1){pinCfg=cfg||null;$('mTitle').textContent=pinCfg?pinCfg.title:'Enter PIN';$('mSub').textContent=pinCfg?pinCfg.sub:'Enter the 4-digit PIN to unlock the reset.';$('pinOk').textContent=pinCfg?(pinCfg.btn||'Confirm'):'Unlock';$('pin').value='';$('pinErr').hidden=true;setTimeout(()=>$('pin').focus(),50)}
   if(step===2)$('mWarn').textContent='This permanently deletes '+S.bills.length+' bill'+(S.bills.length===1?'':'s')+', all payments, photos and Firebase cloud backup. This cannot be undone.';
   syncLock()}
+function askSaveLock(title,sub,fn){modal(1,{title,sub,btn:'Confirm',hash:SAVE_HASH,fn})}
 function syncLock(){document.body.style.overflow=($('modal').hidden&&$('imgModal').hidden&&$('impModal').hidden)?'':'hidden'}
 $('resetBtn').onclick=()=>modal(1);
 let curImg={src:'',name:'receipt.jpg'};
@@ -1036,12 +1046,13 @@ $('imgModal').addEventListener('click',e=>{if(e.target===$('imgModal')||e.target
 $('impModal').addEventListener('click',e=>{if(e.target===$('impModal')||e.target.closest('[data-impclose]'))closeImp()});
 $('imgDl').onclick=()=>{if(!curImg.src)return;const a=document.createElement('a');a.href=curImg.src;a.download=curImg.name;a.click()};
 $('modal').addEventListener('click',e=>{if(e.target===$('modal')||e.target.closest('[data-close]'))modal(0)});
-document.addEventListener('keydown',e=>{if(e.key==='Escape'){if(!$('imgModal').hidden)closeImg();else if(!$('impModal').hidden)closeImp();else if(!$('modal').hidden)modal(0)}});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){if(!$('modal').hidden)modal(0);else if(!$('imgModal').hidden)closeImg();else if(!$('impModal').hidden)closeImp()}});
 async function tryPin(){
   const now=Date.now();
   if(now<pinLockUntil){$('pinErr').textContent='Too many attempts. Try again in '+Math.ceil((pinLockUntil-now)/1000)+'s.';$('pinErr').hidden=false;return}
-  if(await pinOk($('pin').value.trim())){pinTries=0;modal(2)}
-  else{pinTries++;$('pin').value='';if(pinTries>=5){pinLockUntil=Date.now()+30000;pinTries=0;$('pinErr').textContent='Too many attempts. Locked for 30 seconds.'}else $('pinErr').textContent='Wrong PIN. Try again.';$('pinErr').hidden=false}
+  const cfg=pinCfg,target=cfg?cfg.hash:PIN_HASH;
+  if(await pinOk($('pin').value.trim(),target)){pinTries=0;if(cfg){const fn=cfg.fn;modal(0);fn();return}modal(2)}
+  else{pinTries++;$('pin').value='';if(pinTries>=5){pinLockUntil=Date.now()+30000;pinTries=0;$('pinErr').textContent='Too many attempts. Locked for 30 seconds.'}else $('pinErr').textContent=(cfg?'Wrong passcode':'Wrong PIN')+'. Try again.';$('pinErr').hidden=false}
 }
 $('pinOk').onclick=tryPin;
 $('pin').addEventListener('keydown',e=>{if(e.key==='Enter')tryPin()});
@@ -1238,14 +1249,17 @@ $('impSkipDup').onchange=updImpPreview;
 IMP_FIELDS.forEach(([id])=>$(id).onchange=updImpPreview);
 $('impDoBtn').onclick=()=>{
   if(!impSt.ready.length)return;
-  const now=Date.now(),prevLen=S.bills.length;
-  const added=impSt.ready.map((r,i)=>{
-    const item={id:now.toString(36)+i.toString(36)+Math.random().toString(36).slice(2,5),supplier:r.supplier,no:r.no,amount:r.amount,date:r.date,days:r.days,notes:r.notes,paid:r.paid,pays:r.paid>0?[{d:r.date,a:r.paid,r:'Imported'}]:[],created:r.date,updatedAt:now};
-    S.bills.push(item);S.dirty[item.id]=true;delete S.dels[item.id];return item;
+  const rowsCopy=impSt.ready.slice(),tot=rowsCopy.reduce((s,r)=>s+r.amount,0);
+  askSaveLock('Confirm Excel import',rowsCopy.length+' bill'+(rowsCopy.length===1?'':'s')+' ('+inr(tot)+') — enter passcode to import.',()=>{
+    const now=Date.now(),prevLen=S.bills.length;
+    const added=rowsCopy.map((r,i)=>{
+      const item={id:now.toString(36)+i.toString(36)+Math.random().toString(36).slice(2,5),supplier:r.supplier,no:r.no,amount:r.amount,date:r.date,days:r.days,notes:r.notes,paid:r.paid,pays:r.paid>0?[{d:r.date,a:r.paid,r:'Imported'}]:[],created:r.date,updatedAt:now};
+      S.bills.push(item);S.dirty[item.id]=true;delete S.dels[item.id];return item;
+    });
+    if(!save()){S.bills.length=prevLen;added.forEach(item=>delete S.dirty[item.id]);toast('Storage full — backup or remove old photos');return}
+    closeImp();render();toast('Imported '+added.length+' bill'+(added.length===1?'':'s'));
+    window.fbPushBills?.(added);
   });
-  if(!save()){S.bills.length=prevLen;added.forEach(item=>delete S.dirty[item.id]);toast('Storage full — backup or remove old photos');return}
-  closeImp();render();toast('Imported '+added.length+' bill'+(added.length===1?'':'s'));
-  window.fbPushBills?.(added);
 };
 $('cloudPill').onclick=()=>window.fbSyncNow?window.fbSyncNow(true):toast('Connecting to Firebase…');
 $('syncNowBtn').onclick=()=>window.fbSyncNow?window.fbSyncNow(true):toast('Connecting to Firebase…');
