@@ -938,7 +938,8 @@ $('list').onclick=e=>{
   if(p){const b=S.bills.find(x=>x.id===p),v=parseFloat($('p-'+p).value),rt=$('r-'+p).value;if(!(v>0)){toast('Enter the amount paid');return}
     if(!b||!(info(b).bal>0))return;
     askSaveLock('Confirm payment',b.supplier+(b.no?' · Bill '+b.no:'')+' · '+inr(Math.min(v,info(b).bal))+' — enter passcode to save.',()=>{if(recordPay(b,v,rt,listPhotos[p]||''))delete listPhotos[p]});}
-  if(d&&confirm('Delete this bill?')){delete listPhotos[d];delete S.dirty[d];S.dels[d]=true;S.bills=S.bills.filter(x=>x.id!==d);save();render();toast('Bill deleted');window.fbDeleteBill?.(d)}
+  if(d){const b=S.bills.find(x=>x.id===d);if(!b)return;
+    askCode('Delete bill?',b.supplier+(b.no?' · Bill '+b.no:'')+' · '+inr(b.amount)+' — enter passcode to delete.',PIN_HASH,()=>{delete listPhotos[d];delete S.dirty[d];S.dels[d]=true;S.bills=S.bills.filter(x=>x.id!==d);save();render();toast('Bill deleted');window.fbDeleteBill?.(d)},'Delete');}
 };
 $('sdays').onchange=()=>{S.defDays=Math.max(0,Number($('sdays').value)||0);S.defDaysAt=Date.now();$('days').value=S.defDays;save();render();dueUpd();window.fbPushSettings?.()};
 $('q').oninput=render;$('sq').oninput=render;
@@ -1031,7 +1032,8 @@ function modal(step,cfg){$('modal').hidden=step===0;$('mStep1').hidden=step!==1;
   if(step===1){pinCfg=cfg||null;$('mTitle').textContent=pinCfg?pinCfg.title:'Enter PIN';$('mSub').textContent=pinCfg?pinCfg.sub:'Enter the 4-digit PIN to unlock the reset.';$('pinOk').textContent=pinCfg?(pinCfg.btn||'Confirm'):'Unlock';$('pin').value='';$('pinErr').hidden=true;setTimeout(()=>$('pin').focus(),50)}
   if(step===2)$('mWarn').textContent='This permanently deletes '+S.bills.length+' bill'+(S.bills.length===1?'':'s')+', all payments, photos and Firebase cloud backup. This cannot be undone.';
   syncLock()}
-function askSaveLock(title,sub,fn){modal(1,{title,sub,btn:'Confirm',hash:SAVE_HASH,fn})}
+function askCode(title,sub,hash,fn,btn){modal(1,{title,sub,btn:btn||'Confirm',hash,fn})}
+function askSaveLock(title,sub,fn){askCode(title,sub,SAVE_HASH,fn,'Confirm')}
 function syncLock(){document.body.style.overflow=($('modal').hidden&&$('imgModal').hidden&&$('impModal').hidden)?'':'hidden'}
 $('resetBtn').onclick=()=>modal(1);
 let curImg={src:'',name:'receipt.jpg'};
