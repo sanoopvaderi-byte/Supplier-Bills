@@ -363,7 +363,7 @@ td:not(:first-child),th:not(:first-child){text-align:right;font-variant-numeric:
             </div>
           </div>
           <label>Supplier<select id="paySup"></select></label>
-          <label>Bill no.<select id="payBill"></select></label>
+          <label>Purchase bill no.<select id="payBill"></select></label>
           <label class="full">RT / Receipt number<input id="payRt" placeholder="Optional · RT or receipt no."></label>
           <div class="full">
             <span class="lbl">Payment / Receipt photo (auto-compressed)</span>
@@ -864,18 +864,23 @@ function recordPay(b,v,r,img){
   if(img)entry.img=img;
   b.pays.push(entry);S.dirty[b.id]=true;delete S.dels[b.id];
   if(!save()){b.paid=prevPaid;b.pays.length=prevLen;b.updatedAt=prevAt;delete S.dirty[b.id];toast('Storage full — backup or remove old photos');return false}
-  render();toast(inr(v)+' payment recorded');window.fbPushBill?.(b);return true;
+  render();toast(inr(v)+' payment recorded'+(b.no?' · Bill '+b.no:''));window.fbPushBill?.(b);return true;
 }
+const openSupBills=sup=>S.bills.map(b=>({b,i:info(b)})).filter(x=>x.i.bal>0&&x.b.supplier===sup).sort((a,c)=>a.i.due-c.i.due);
 function getPayMax(){
-  const sup=$('paySup').value,bid=$('payBill').value;
-  const open=S.bills.map(b=>({b,i:info(b)})).filter(x=>x.i.bal>0&&x.b.supplier===sup).sort((a,c)=>a.i.due-c.i.due);
+  const sup=$('paySup').value,bid=$('payBill').value,open=openSupBills(sup);
   if(bid==='__all')return open.reduce((s,x)=>s+x.i.bal,0);
   const f=open.find(x=>x.b.id===bid);return f?f.i.bal:0;
 }
-function updPayHint(){const m=getPayMax();$('payBalHint').textContent=m>0?'Balance: '+inr(m):''}
+function updPayHint(){
+  const sup=$('paySup').value,bid=$('payBill').value,open=openSupBills(sup),m=getPayMax();
+  if(!(m>0)){$('payBalHint').textContent='';return}
+  const f=bid==='__all'?null:open.find(x=>x.b.id===bid);
+  $('payBalHint').textContent=(f?(f.b.no?'Bill '+f.b.no:fmtShort(f.b.date)):'All '+open.length+' bills')+' · Bal '+inr(m);
+}
 function fillPayBills(supMap){
   const sup=$('paySup').value;
-  const list=supMap?supMap[sup].bills:S.bills.map(b=>({b,i:info(b)})).filter(x=>x.i.bal>0&&x.b.supplier===sup).sort((a,c)=>a.i.due-c.i.due);
+  const list=supMap?supMap[sup].bills:openSupBills(sup);
   const prev=$('payBill').value;
   let opts=list.map(({b,i})=>`<option value="${esc(b.id)}">${b.no?'Bill '+esc(b.no):'No bill no.'} · ${fmtShort(b.date)} (Bal ${inr(i.bal)})</option>`).join('');
   if(list.length>1){const tot=list.reduce((s,x)=>s+x.i.bal,0);opts+=`<option value="__all">All ${list.length} open bills · oldest first (${inr(tot)})</option>`}
@@ -900,9 +905,17 @@ $('paySubmit').onclick=()=>{
   const oneB=bid==='__all'?null:S.bills.find(x=>x.id===bid);
   if(bid!=='__all'&&!oneB)return;
   const imgKeep=payPhotoData;
-  askSaveLock('Confirm payment',sup+' · '+inr(amt)+(rt?' · RT '+rt:'')+' — enter passcode to save.',()=>{
+  let billDesc='';
+  if(bid==='__all'){
+    const cov=[];let remC=amt;
+    for(const x of openSupBills(sup)){if(remC<=0.005)break;cov.push(x.b.no||'#'+fmtShort(x.b.date));remC-=x.i.bal}
+    billDesc='Bills '+cov.slice(0,3).join(', ')+(cov.length>3?' +'+(cov.length-3)+' more':'');
+  }else{
+    billDesc=oneB.no?'Bill '+oneB.no:fmtShort(oneB.date);
+  }
+  askSaveLock('Confirm payment',sup+' · '+billDesc+' · '+inr(amt)+(rt?' · RT '+rt:'')+' — enter passcode to save.',()=>{
     if(bid==='__all'){
-      const list=S.bills.map(b=>({b,i:info(b)})).filter(x=>x.i.bal>0&&x.b.supplier===sup).sort((a,c)=>a.i.due-c.i.due);
+      const list=openSupBills(sup);
       const snap=list.map(x=>({b:x.b,p:x.b.paid||0,l:x.b.pays.length,u:x.b.updatedAt}));
       let rem=amt,img=imgKeep;const d=iso(new Date()),now=Date.now(),touched=[];
       for(const x of list){
