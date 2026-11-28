@@ -169,12 +169,15 @@ input[type=file]::file-selector-button{margin-right:12px;border:0;border-radius:
 #editModal{z-index:108;padding:16px}
 #impModal{z-index:105;padding:14px}
 .mbox,.imbox,.impbox{width:100%;max-width:380px;background:var(--surface);border:1px solid var(--line);border-radius:22px;padding:20px;box-shadow:0 24px 60px rgba(0,0,0,.35);animation:in .2s ease both}
-.imbox{max-width:520px;padding:16px;display:grid;gap:12px}.imbox .acts{flex-wrap:wrap}
+.imbox{max-width:680px;padding:16px;display:grid;gap:12px}.imbox .acts{flex-wrap:wrap}.imbox .acts .btn{flex:1 1 42%;min-width:120px}
 .impbox{max-width:540px;max-height:88vh;overflow-y:auto;padding:16px;display:grid;gap:12px}
 .impdet{border:1px solid var(--line);border-radius:12px;padding:8px 10px;background:var(--bg)}.impdet summary{cursor:pointer;font-size:.84rem;font-weight:650;color:var(--brand);display:flex;justify-content:space-between;align-items:center;list-style:none}.impdet summary::-webkit-details-marker{display:none}.impdet[open] summary{margin-bottom:10px}
 .mgrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px}.mgrid>*{min-width:0}.mgrid select{min-height:42px;padding:8px 10px}
 .impbox table{font-size:.8rem}.impbox th,.impbox td{padding:7px 4px}
-#imgView{width:100%;max-height:62vh;object-fit:contain;border-radius:12px;border:1px solid var(--line);background:#fff}
+.imgstage{max-height:64vh;overflow:auto;border-radius:12px;border:1px solid var(--line);background:#fff;touch-action:pan-x pan-y pinch-zoom;-webkit-overflow-scrolling:touch}
+#imgView{display:block;width:100%;max-height:62vh;object-fit:contain;cursor:zoom-in}
+#imgView.z2{width:200%;max-width:none;max-height:none;cursor:zoom-in}
+#imgView.z3{width:300%;max-width:none;max-height:none;cursor:zoom-out}
 @media (max-width:340px){.expgrid{grid-template-columns:1fr}}
 .phist{border-top:1px dashed var(--line);padding-top:8px;display:grid;gap:6px;font-size:.84rem;color:var(--mute)}
 .phist .pl{display:flex;justify-content:space-between;align-items:center;gap:8px}.phist b{color:var(--ink)}
@@ -330,7 +333,7 @@ td:not(:first-child),th:not(:first-child){text-align:right;font-variant-numeric:
           <div class="full"><div class="chips wrap" id="dchips"><button type="button" data-d="30">30 days</button><button type="button" data-d="45">45 days</button><button type="button" data-d="60">60 days</button><button type="button" data-d="90">90 days</button></div><p class="hint" id="duePrev"></p></div>
           <label class="full">Note<input id="notes" placeholder="Products or anything to identify the bill"></label>
           <div class="full">
-            <span class="lbl">Bill photo (auto-compressed)</span>
+            <span class="lbl">Bill photo (HD clear · tap to zoom after upload)</span>
             <div class="pgrid" id="entryPick">
               <label class="pbtn"><input id="entryCam" type="file" accept="image/*" capture="environment"><svg class="i"><use href="#i-cam"/></svg><span>Camera</span></label>
               <label class="pbtn"><input id="entryPhoto" type="file" accept="image/*"><svg class="i"><use href="#i-img"/></svg><span>Gallery</span></label>
@@ -495,8 +498,9 @@ td:not(:first-child),th:not(:first-child){text-align:right;font-variant-numeric:
         <div><h2 id="imgTitle">Payment photo</h2><div class="meta" id="imgMeta"></div></div>
         <button class="icon-btn" type="button" data-iclose aria-label="Close"><svg class="i"><use href="#i-x"/></svg></button>
       </div>
-      <img id="imgView" alt="Payment photo">
+      <div class="imgstage" id="imgStage"><img id="imgView" alt="Payment photo"></div>
       <div class="acts">
+        <button class="btn ghost sm" id="imgZoom" type="button"><svg class="i"><use href="#i-search"/></svg><span>Zoom 2x</span></button>
         <label class="btn ghost sm" id="imgChgLbl" hidden style="position:relative;cursor:pointer"><input id="imgChgFile" type="file" accept="image/*" style="position:absolute;opacity:0;width:1px;height:1px;pointer-events:none"><svg class="i"><use href="#i-cam"/></svg><span>Change photo</span></label>
         <button class="btn ghost sm" id="imgDl" type="button"><svg class="i"><use href="#i-down"/></svg>Download</button>
         <button class="btn sm" type="button" data-iclose>Close</button>
@@ -616,23 +620,20 @@ function payEvents(b){
 function toast(m){const t=$('toast');t.textContent=m;t.classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>t.classList.remove('show'),2200)}
 let showAll=false,homeKpi='m',listF='pending',srchF='pending',payPhotoData='',entryPhotoData='',listPhotos={};
 const kb=d=>Math.max(1,Math.round(d.length*0.75/1024))+' KB';
-function compressPhoto(file){
+function compressPhoto(file,hd){
   return new Promise((res,rej)=>{
     const url=URL.createObjectURL(file),img=new Image();
     img.onload=()=>{
       URL.revokeObjectURL(url);
-      let w=img.naturalWidth||img.width,h=img.naturalHeight||img.height,max=720;
-      if(w>max||h>max){if(w>=h){h=Math.round(h*max/w);w=max}else{w=Math.round(w*max/h);h=max}}
-      const c=document.createElement('canvas');c.width=w;c.height=h;
-      const ctx=c.getContext('2d');ctx.fillStyle='#ffffff';ctx.fillRect(0,0,w,h);ctx.drawImage(img,0,0,w,h);
-      let q=0.58,data=c.toDataURL('image/jpeg',q);
-      while(data.length>65000&&q>0.28){q-=0.1;data=c.toDataURL('image/jpeg',q)}
-      if(data.length>65000&&(w>540||h>540)){
-        const s=540/Math.max(w,h);c.width=Math.round(w*s);c.height=Math.round(h*s);
-        ctx.fillStyle='#ffffff';ctx.fillRect(0,0,c.width,c.height);ctx.drawImage(img,0,0,c.width,c.height);
-        data=c.toDataURL('image/jpeg',0.45);
+      const iw=img.naturalWidth||img.width,ih=img.naturalHeight||img.height;
+      const limit=hd?235000:65000,dims=hd?[1600,1400,1200,1024,900]:[720,540],qs=hd?[0.82,0.74,0.66,0.58,0.5]:[0.58,0.48,0.38,0.28];
+      const c=document.createElement('canvas'),ctx=c.getContext('2d');let best='';
+      for(const max of dims){
+        let w=iw,h=ih;if(w>max||h>max){if(w>=h){h=Math.round(h*max/w);w=max}else{w=Math.round(w*max/h);h=max}}
+        c.width=w;c.height=h;ctx.fillStyle='#ffffff';ctx.fillRect(0,0,w,h);ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';ctx.drawImage(img,0,0,w,h);
+        for(const q of qs){best=c.toDataURL('image/jpeg',q);if(best.length<=limit){res(best);return}}
       }
-      res(data);
+      res(best);
     };
     img.onerror=()=>{URL.revokeObjectURL(url);rej(new Error('bad'))};
     img.src=url;
@@ -838,9 +839,9 @@ function clearEntryPhoto(){entryPhotoData='';$('entryCam').value='';$('entryPhot
 async function pickPhoto(e,kind){
   const f=e.target.files[0];if(!f)return;
   try{
-    const d=await compressPhoto(f),pre=kind==='entry'?'entry':'pay';
-    if(kind==='entry')entryPhotoData=d;else payPhotoData=d;
-    $(pre+'Thumb').src=d;$(pre+'Size').textContent='Compressed · '+kb(d)+' (tap to view)';
+    const hd=kind==='entry',d=await compressPhoto(f,hd),pre=hd?'entry':'pay';
+    if(hd)entryPhotoData=d;else payPhotoData=d;
+    $(pre+'Thumb').src=d;$(pre+'Size').textContent=(hd?'HD ready · ':'Compressed · ')+kb(d)+' (tap to view)';
     $(pre+'Pick').hidden=true;$(pre+'Prev').hidden=false;
   }catch(x){toast('Could not read that photo')}
   e.target.value='';
@@ -1108,15 +1109,23 @@ $('editSave').onclick=()=>{
     closeEdit();render();toast(no?'Invoice '+no+' saved':'Bill details updated');window.fbPushBill?.(b);
   });
 };
-let curImg={src:'',name:'receipt.jpg',ref:null};
+let curImg={src:'',name:'receipt.jpg',ref:null,zoom:1};
+function setImgZoom(z){
+  curImg.zoom=z;$('imgView').className=z===2?'z2':z===3?'z3':'';
+  $('imgZoom').querySelector('span').textContent=z===1?'Zoom 2x':z===2?'Zoom 3x':'Reset 1x';
+  const st=$('imgStage');
+  if(z===1){st.scrollLeft=0;st.scrollTop=0}else{requestAnimationFrame(()=>{st.scrollLeft=Math.max(0,(st.scrollWidth-st.clientWidth)/2)})}
+}
 function openImg(src,title,meta,name,ref){
-  curImg={src,name:name||'receipt.jpg',ref:ref||null};
-  $('imgView').src=src;$('imgTitle').textContent=title||'Payment photo';$('imgMeta').textContent=meta||'';
+  curImg={src,name:name||'receipt.jpg',ref:ref||null,zoom:1};
+  setImgZoom(1);$('imgView').src=src;$('imgTitle').textContent=title||'Payment photo';$('imgMeta').textContent=meta||'';
   $('imgChgLbl').hidden=!curImg.ref;$('imgChgFile').value='';
   $('imgModal').hidden=false;syncLock();
 }
-function closeImg(){$('imgModal').hidden=true;$('imgView').src='';$('imgChgLbl').hidden=true;$('imgChgFile').value='';curImg.ref=null;syncLock()}
+function closeImg(){$('imgModal').hidden=true;$('imgView').src='';setImgZoom(1);$('imgChgLbl').hidden=true;$('imgChgFile').value='';curImg.ref=null;syncLock()}
 function closeImp(){$('impModal').hidden=true;impSt.wb=null;impSt.rows=[];impSt.ready=[];$('impSupHint').hidden=true;syncLock()}
+$('imgZoom').onclick=()=>setImgZoom(curImg.zoom===1?2:curImg.zoom===2?3:1);
+$('imgView').onclick=()=>setImgZoom(curImg.zoom===1?2:curImg.zoom===2?3:1);
 $('imgModal').addEventListener('click',e=>{if(e.target===$('imgModal')||e.target.closest('[data-iclose]'))closeImg()});
 $('impModal').addEventListener('click',e=>{if(e.target===$('impModal')||e.target.closest('[data-impclose]'))closeImp()});
 $('modal').addEventListener('click',e=>{if(e.target===$('modal')||e.target.closest('[data-close]'))modal(0)});
@@ -1124,7 +1133,7 @@ $('imgDl').onclick=()=>{if(!curImg.src)return;const a=document.createElement('a'
 $('imgChgFile').onchange=async e=>{
   const f=e.target.files[0],ref=curImg.ref;if(!f||!ref)return;
   try{
-    const data=await compressPhoto(f),b=S.bills.find(x=>x.id===ref.bid);if(!b)return;
+    const data=await compressPhoto(f,ref.kind==='bill'),b=S.bills.find(x=>x.id===ref.bid);if(!b)return;
     const p=ref.kind==='pay'?b.pays[ref.idx]:null;if(ref.kind==='pay'&&!p)return;
     const sub=b.supplier+(ref.kind==='pay'?' · '+fmt(p.d)+' · '+inr(p.a):' · '+inr(b.amount))+' — enter passcode to replace photo.';
     askSaveLock('Replace photo?',sub,()=>{
