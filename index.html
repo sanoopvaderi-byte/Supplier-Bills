@@ -169,12 +169,13 @@ input[type=file]::file-selector-button{margin-right:12px;border:0;border-radius:
 #editModal{z-index:108;padding:16px}
 #impModal{z-index:105;padding:14px}
 .mbox,.imbox,.impbox{width:100%;max-width:380px;background:var(--surface);border:1px solid var(--line);border-radius:22px;padding:20px;box-shadow:0 24px 60px rgba(0,0,0,.35);animation:in .2s ease both}
-.imbox{max-width:min(860px,96vw);padding:16px;display:grid;gap:12px}.imbox .acts{flex-wrap:wrap}
+.imbox{max-width:min(860px,96vw);padding:16px;display:grid;gap:12px}.imbox .acts{flex-wrap:wrap}.imbox .acts .btn{flex:1 1 42%;min-width:120px}
 .impbox{max-width:540px;max-height:88vh;overflow-y:auto;padding:16px;display:grid;gap:12px}
 .impdet{border:1px solid var(--line);border-radius:12px;padding:8px 10px;background:var(--bg)}.impdet summary{cursor:pointer;font-size:.84rem;font-weight:650;color:var(--brand);display:flex;justify-content:space-between;align-items:center;list-style:none}.impdet summary::-webkit-details-marker{display:none}.impdet[open] summary{margin-bottom:10px}
 .mgrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px}.mgrid>*{min-width:0}.mgrid select{min-height:42px;padding:8px 10px}
 .impbox table{font-size:.8rem}.impbox th,.impbox td{padding:7px 4px}
-#imgView{width:100%;max-height:70vh;object-fit:contain;border-radius:12px;border:1px solid var(--line);background:#fff}
+.imgstage{max-height:68vh;overflow:auto;border-radius:12px;border:1px solid var(--line);background:#fff;touch-action:pan-x pan-y;-webkit-overflow-scrolling:touch}
+#imgView{display:block;width:100%;max-height:66vh;object-fit:contain;cursor:zoom-in}
 @media (max-width:340px){.expgrid{grid-template-columns:1fr}}
 .phist{border-top:1px dashed var(--line);padding-top:8px;display:grid;gap:6px;font-size:.84rem;color:var(--mute)}
 .phist .pl{display:flex;justify-content:space-between;align-items:center;gap:8px}.phist b{color:var(--ink)}
@@ -495,8 +496,9 @@ td:not(:first-child),th:not(:first-child){text-align:right;font-variant-numeric:
         <div><h2 id="imgTitle">Payment photo</h2><div class="meta" id="imgMeta"></div></div>
         <button class="icon-btn" type="button" data-iclose aria-label="Close"><svg class="i"><use href="#i-x"/></svg></button>
       </div>
-      <img id="imgView" alt="Payment photo">
+      <div class="imgstage" id="imgStage"><img id="imgView" alt="Payment photo"></div>
       <div class="acts">
+        <button class="btn ghost sm" id="imgZoom" type="button"><svg class="i"><use href="#i-search"/></svg><span>Zoom 2x</span></button>
         <label class="btn ghost sm" id="imgChgLbl" hidden style="position:relative;cursor:pointer"><input id="imgChgFile" type="file" accept="image/*" style="position:absolute;opacity:0;width:1px;height:1px;pointer-events:none"><svg class="i"><use href="#i-cam"/></svg><span>Change photo</span></label>
         <button class="btn ghost sm" id="imgDl" type="button"><svg class="i"><use href="#i-down"/></svg>Download</button>
         <button class="btn sm" type="button" data-iclose>Close</button>
@@ -1105,15 +1107,38 @@ $('editSave').onclick=()=>{
     closeEdit();render();toast(no?'Invoice '+no+' saved':'Bill details updated');window.fbPushBill?.(b);
   });
 };
-let curImg={src:'',name:'receipt.jpg',ref:null};
+let curImg={src:'',name:'receipt.jpg',ref:null,zoom:1},pinchSt=null,skipImgTap=false;
+function setImgZoom(z){
+  const clamped=Math.min(4,Math.max(1,Math.round(Number(z)*100)/100||1));
+  const st=$('imgStage'),iv=$('imgView'),prevZ=curImg.zoom||1;
+  const cx=st.scrollWidth>0?(st.scrollLeft+st.clientWidth/2)/st.scrollWidth:0.5;
+  const cy=st.scrollHeight>0?(st.scrollTop+st.clientHeight/2)/st.scrollHeight:0.35;
+  if(clamped<=1.02){
+    curImg.zoom=1;iv.style.width='';iv.style.maxWidth='';iv.style.maxHeight='';iv.style.cursor='zoom-in';
+    $('imgZoom').querySelector('span').textContent='Zoom 2x';st.scrollLeft=0;st.scrollTop=0;return;
+  }
+  curImg.zoom=clamped;iv.style.width=Math.round(clamped*100)+'%';iv.style.maxWidth='none';iv.style.maxHeight='none';
+  iv.style.cursor=clamped>=3.9?'zoom-out':'zoom-in';
+  $('imgZoom').querySelector('span').textContent=clamped<1.9?'Zoom 2x':clamped<2.9?'Zoom 3x':clamped<3.9?'Zoom 4x':'Reset 1x';
+  const fx=prevZ<=1.02?0.5:cx,fy=prevZ<=1.02?0.35:cy;
+  st.scrollLeft=Math.max(0,fx*st.scrollWidth-st.clientWidth/2);
+  st.scrollTop=Math.max(0,fy*st.scrollHeight-st.clientHeight/2);
+}
 function openImg(src,title,meta,name,ref){
-  curImg={src,name:name||'receipt.jpg',ref:ref||null};
-  $('imgView').src=src;$('imgTitle').textContent=title||'Payment photo';$('imgMeta').textContent=meta||'';
+  curImg={src,name:name||'receipt.jpg',ref:ref||null,zoom:1};
+  setImgZoom(1);$('imgView').src=src;$('imgTitle').textContent=title||'Payment photo';$('imgMeta').textContent=meta||'';
   $('imgChgLbl').hidden=!curImg.ref;$('imgChgFile').value='';
   $('imgModal').hidden=false;syncLock();
 }
-function closeImg(){$('imgModal').hidden=true;$('imgView').src='';$('imgChgLbl').hidden=true;$('imgChgFile').value='';curImg.ref=null;syncLock()}
+function closeImg(){$('imgModal').hidden=true;$('imgView').src='';setImgZoom(1);pinchSt=null;$('imgChgLbl').hidden=true;$('imgChgFile').value='';curImg.ref=null;syncLock()}
 function closeImp(){$('impModal').hidden=true;impSt.wb=null;impSt.rows=[];impSt.ready=[];$('impSupHint').hidden=true;syncLock()}
+const nextImgStep=()=>setImgZoom(curImg.zoom<1.9?2:curImg.zoom<2.9?3:curImg.zoom<3.9?4:1);
+$('imgZoom').onclick=nextImgStep;
+$('imgView').onclick=()=>{if(skipImgTap){skipImgTap=false;return}nextImgStep()};
+const pinchDist=t=>Math.hypot(t[0].clientX-t[1].clientX,t[0].clientY-t[1].clientY);
+$('imgStage').addEventListener('touchstart',e=>{if(e.touches.length===2)pinchSt={d:Math.max(10,pinchDist(e.touches)),z:curImg.zoom||1,moved:false}},{passive:true});
+$('imgStage').addEventListener('touchmove',e=>{if(!pinchSt||e.touches.length!==2)return;e.preventDefault();pinchSt.moved=true;setImgZoom(pinchSt.z*(pinchDist(e.touches)/pinchSt.d))},{passive:false});
+$('imgStage').addEventListener('touchend',e=>{if(e.touches.length<2){if(pinchSt&&pinchSt.moved){skipImgTap=true;setTimeout(()=>{skipImgTap=false},250)}pinchSt=null}});
 $('imgModal').addEventListener('click',e=>{if(e.target===$('imgModal')||e.target.closest('[data-iclose]'))closeImg()});
 $('impModal').addEventListener('click',e=>{if(e.target===$('impModal')||e.target.closest('[data-impclose]'))closeImp()});
 $('modal').addEventListener('click',e=>{if(e.target===$('modal')||e.target.closest('[data-close]'))modal(0)});
@@ -1129,7 +1154,7 @@ $('imgChgFile').onchange=async e=>{
       if(ref.kind==='pay')p.img=data;else b.img=data;
       b.updatedAt=Date.now();S.dirty[b.id]=true;delete S.dels[b.id];
       if(!save()){if(ref.kind==='pay')p.img=prevImg;else b.img=prevImg;b.updatedAt=prevAt;delete S.dirty[b.id];toast('Storage full — backup or remove old photos');return}
-      curImg.src=data;$('imgView').src=data;render();toast('Photo replaced');window.fbPushBill?.(b);
+      curImg.src=data;$('imgView').src=data;setImgZoom(1);render();toast('Photo replaced');window.fbPushBill?.(b);
     });
   }catch(x){toast('Could not read that photo')}
   finally{e.target.value=''}
