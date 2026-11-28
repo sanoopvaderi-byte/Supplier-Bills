@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#0f766e">
 <title>Inhaero Pharmacy</title>
 <style>
@@ -18,8 +18,8 @@
 --blue:#8ab4ff;--blue-t:#16264a;--green:#6ee7a0;--green-t:#10301f;--amber:#fbbf4a;--amber-t:#33260a;--red:#ff9a9a;--red-t:#3a1618;
 --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.35);color-scheme:dark}}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html{-webkit-text-size-adjust:100%;text-size-adjust:100%;scroll-behavior:smooth}
-body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%;scroll-behavior:smooth;touch-action:pan-x pan-y}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased;touch-action:pan-x pan-y}
 button,input,select{font:inherit;font-size:16px;color:inherit;touch-action:manipulation}
 button{cursor:pointer;border:0;background:none;padding:0}
 svg.i{width:1.25em;height:1.25em;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;flex:none}
@@ -1433,6 +1433,8 @@ $('syncNowBtn').onclick=()=>window.fbSyncNow?window.fbSyncNow(true):toast('Conne
 window.APP={get:()=>S,set:v=>{S=v},save,norm,render,dueUpd,iso,toast,setCloudUI};
 let lastDay=iso(new Date());
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&iso(new Date())!==lastDay){lastDay=iso(new Date());render()}});
+['gesturestart','gesturechange','gestureend'].forEach(ev=>document.addEventListener(ev,e=>e.preventDefault(),{passive:false}));
+document.addEventListener('touchmove',e=>{if(e.touches.length>1||(e.scale&&e.scale!==1))e.preventDefault()},{passive:false});
 route();
 </script>
 
