@@ -169,15 +169,16 @@ input[type=file]::file-selector-button{margin-right:12px;border:0;border-radius:
 #editModal{z-index:108;padding:16px}
 #impModal{z-index:105;padding:14px}
 .mbox,.imbox,.impbox{width:100%;max-width:380px;background:var(--surface);border:1px solid var(--line);border-radius:22px;padding:20px;box-shadow:0 24px 60px rgba(0,0,0,.35);animation:in .2s ease both}
-.imbox{max-width:680px;padding:16px;display:grid;gap:12px}.imbox .acts{flex-wrap:wrap}.imbox .acts .btn{flex:1 1 42%;min-width:120px}
+.imbox{max-width:min(860px,96vw);padding:16px;display:grid;gap:12px}.imbox .acts{flex-wrap:wrap}.imbox .acts .btn{flex:1 1 42%;min-width:120px}
 .impbox{max-width:540px;max-height:88vh;overflow-y:auto;padding:16px;display:grid;gap:12px}
 .impdet{border:1px solid var(--line);border-radius:12px;padding:8px 10px;background:var(--bg)}.impdet summary{cursor:pointer;font-size:.84rem;font-weight:650;color:var(--brand);display:flex;justify-content:space-between;align-items:center;list-style:none}.impdet summary::-webkit-details-marker{display:none}.impdet[open] summary{margin-bottom:10px}
 .mgrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px}.mgrid>*{min-width:0}.mgrid select{min-height:42px;padding:8px 10px}
 .impbox table{font-size:.8rem}.impbox th,.impbox td{padding:7px 4px}
-.imgstage{max-height:64vh;overflow:auto;border-radius:12px;border:1px solid var(--line);background:#fff;touch-action:pan-x pan-y pinch-zoom;-webkit-overflow-scrolling:touch}
-#imgView{display:block;width:100%;max-height:62vh;object-fit:contain;cursor:zoom-in}
+.imgstage{max-height:70vh;overflow:auto;border-radius:12px;border:1px solid var(--line);background:#fff;touch-action:pan-x pan-y pinch-zoom;-webkit-overflow-scrolling:touch}
+#imgView{display:block;width:100%;max-height:68vh;object-fit:contain;cursor:zoom-in}
 #imgView.z2{width:200%;max-width:none;max-height:none;cursor:zoom-in}
-#imgView.z3{width:300%;max-width:none;max-height:none;cursor:zoom-out}
+#imgView.z3{width:300%;max-width:none;max-height:none;cursor:zoom-in}
+#imgView.z4{width:400%;max-width:none;max-height:none;cursor:zoom-out}
 @media (max-width:340px){.expgrid{grid-template-columns:1fr}}
 .phist{border-top:1px dashed var(--line);padding-top:8px;display:grid;gap:6px;font-size:.84rem;color:var(--mute)}
 .phist .pl{display:flex;justify-content:space-between;align-items:center;gap:8px}.phist b{color:var(--ink)}
@@ -333,7 +334,7 @@ td:not(:first-child),th:not(:first-child){text-align:right;font-variant-numeric:
           <div class="full"><div class="chips wrap" id="dchips"><button type="button" data-d="30">30 days</button><button type="button" data-d="45">45 days</button><button type="button" data-d="60">60 days</button><button type="button" data-d="90">90 days</button></div><p class="hint" id="duePrev"></p></div>
           <label class="full">Note<input id="notes" placeholder="Products or anything to identify the bill"></label>
           <div class="full">
-            <span class="lbl">Bill photo (HD clear · tap to zoom after upload)</span>
+            <span class="lbl">Bill photo (Full HD clear · tap to zoom)</span>
             <div class="pgrid" id="entryPick">
               <label class="pbtn"><input id="entryCam" type="file" accept="image/*" capture="environment"><svg class="i"><use href="#i-cam"/></svg><span>Camera</span></label>
               <label class="pbtn"><input id="entryPhoto" type="file" accept="image/*"><svg class="i"><use href="#i-img"/></svg><span>Gallery</span></label>
@@ -626,7 +627,7 @@ function compressPhoto(file,hd){
     img.onload=()=>{
       URL.revokeObjectURL(url);
       const iw=img.naturalWidth||img.width,ih=img.naturalHeight||img.height;
-      const limit=hd?235000:65000,dims=hd?[1600,1400,1200,1024,900]:[720,540],qs=hd?[0.82,0.74,0.66,0.58,0.5]:[0.58,0.48,0.38,0.28];
+      const limit=hd?720000:65000,dims=hd?[2400,2048,1800,1600,1280]:[720,540],qs=hd?[0.9,0.85,0.8,0.74,0.66]:[0.58,0.48,0.38,0.28];
       const c=document.createElement('canvas'),ctx=c.getContext('2d');let best='';
       for(const max of dims){
         let w=iw,h=ih;if(w>max||h>max){if(w>=h){h=Math.round(h*max/w);w=max}else{w=Math.round(w*max/h);h=max}}
@@ -1111,8 +1112,8 @@ $('editSave').onclick=()=>{
 };
 let curImg={src:'',name:'receipt.jpg',ref:null,zoom:1};
 function setImgZoom(z){
-  curImg.zoom=z;$('imgView').className=z===2?'z2':z===3?'z3':'';
-  $('imgZoom').querySelector('span').textContent=z===1?'Zoom 2x':z===2?'Zoom 3x':'Reset 1x';
+  curImg.zoom=z;$('imgView').className=z>1?'z'+z:'';
+  $('imgZoom').querySelector('span').textContent=z<4?'Zoom '+(z+1)+'x':'Reset 1x';
   const st=$('imgStage');
   if(z===1){st.scrollLeft=0;st.scrollTop=0}else{requestAnimationFrame(()=>{st.scrollLeft=Math.max(0,(st.scrollWidth-st.clientWidth)/2)})}
 }
@@ -1124,8 +1125,8 @@ function openImg(src,title,meta,name,ref){
 }
 function closeImg(){$('imgModal').hidden=true;$('imgView').src='';setImgZoom(1);$('imgChgLbl').hidden=true;$('imgChgFile').value='';curImg.ref=null;syncLock()}
 function closeImp(){$('impModal').hidden=true;impSt.wb=null;impSt.rows=[];impSt.ready=[];$('impSupHint').hidden=true;syncLock()}
-$('imgZoom').onclick=()=>setImgZoom(curImg.zoom===1?2:curImg.zoom===2?3:1);
-$('imgView').onclick=()=>setImgZoom(curImg.zoom===1?2:curImg.zoom===2?3:1);
+$('imgZoom').onclick=()=>setImgZoom(curImg.zoom<4?curImg.zoom+1:1);
+$('imgView').onclick=()=>setImgZoom(curImg.zoom<4?curImg.zoom+1:1);
 $('imgModal').addEventListener('click',e=>{if(e.target===$('imgModal')||e.target.closest('[data-iclose]'))closeImg()});
 $('impModal').addEventListener('click',e=>{if(e.target===$('impModal')||e.target.closest('[data-impclose]'))closeImp()});
 $('modal').addEventListener('click',e=>{if(e.target===$('modal')||e.target.closest('[data-close]'))modal(0)});
@@ -1141,7 +1142,7 @@ $('imgChgFile').onchange=async e=>{
       if(ref.kind==='pay')p.img=data;else b.img=data;
       b.updatedAt=Date.now();S.dirty[b.id]=true;delete S.dels[b.id];
       if(!save()){if(ref.kind==='pay')p.img=prevImg;else b.img=prevImg;b.updatedAt=prevAt;delete S.dirty[b.id];toast('Storage full — backup or remove old photos');return}
-      curImg.src=data;$('imgView').src=data;render();toast('Photo replaced');window.fbPushBill?.(b);
+      curImg.src=data;$('imgView').src=data;setImgZoom(1);render();toast('Photo replaced');window.fbPushBill?.(b);
     });
   }catch(x){toast('Could not read that photo')}
   finally{e.target.value=''}
@@ -1484,7 +1485,7 @@ function billPayload(b){
     updatedAt:Math.max(1,Number(b.updatedAt)||Date.now())
   };
   if(b.created&&/^\d{4}-\d{2}-\d{2}$/.test(String(b.created)))o.created=b.created;
-  if(b.img&&typeof b.img==='string'&&b.img.length<=250000)o.img=b.img;
+  if(b.img&&typeof b.img==='string'&&b.img.length<=760000)o.img=b.img;
   return o;
 }
 

@@ -27,7 +27,7 @@ service cloud.firestore {
     //   - paid: number (required, >= 0 and <= 100000000) - Total paid amount
     //   - pays: list (required, max 200 items) - Payment history entries
     //   - created: string (optional, 10 chars, YYYY-MM-DD) - Entry creation date
-    //   - img: string (optional, 0..250000 chars) - Compressed bill photo data URL
+    //   - img: string (optional, 0..760000 chars) - Compressed bill photo data URL
     //   - updatedAt: number (required, > 0) - Last sync timestamp in milliseconds
     //
     // Collection: app_meta
@@ -107,7 +107,7 @@ service cloud.firestore {
           && isValidNumberRange(data.paid, 0, 100000000)
           && isValidList(data.pays, 200)
           && isValidOptionalIsoDate(data, 'created')
-          && isValidOptionalString(data, 'img', 0, 250000)
+          && isValidOptionalString(data, 'img', 0, 760000)
           && data.updatedAt is number && data.updatedAt > 0;
     }
 
