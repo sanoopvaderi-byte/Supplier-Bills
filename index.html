@@ -624,7 +624,7 @@ function compressPhoto(file,hd){
     img.onload=()=>{
       URL.revokeObjectURL(url);
       const iw=img.naturalWidth||img.width,ih=img.naturalHeight||img.height;
-      const limit=hd?720000:65000,dims=hd?[2400,2048,1800,1600,1280]:[720,540],qs=hd?[0.9,0.85,0.8,0.74,0.66]:[0.58,0.48,0.38,0.28];
+      const limit=hd?475000:65000,dims=hd?[2048,1800,1600,1400,1200]:[720,540],qs=hd?[0.9,0.84,0.78,0.72,0.66]:[0.58,0.48,0.38,0.28];
       const c=document.createElement('canvas'),ctx=c.getContext('2d');let best='';
       for(const max of dims){
         let w=iw,h=ih;if(w>max||h>max){if(w>=h){h=Math.round(h*max/w);w=max}else{w=Math.round(w*max/h);h=max}}
